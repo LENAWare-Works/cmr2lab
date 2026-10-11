@@ -771,6 +771,114 @@ an arm that forces texturing off — separates them, and it needs no new run mac
 
 ---
 
+## setup-menu car r11 (2026-10-11 15:1x–15:3x EEST) — the car's FRAGMENT inputs measured for the first time, and the first A/B in this ticket that MOVES **and comes back byte-identical**
+
+r10 named the next instrument and stopped one line short of it: *"where the flat colour comes from
+— the bound texture, the stage-0 combine, or the material."* r11 built it, ran it, and got a result
+that is stronger than a null: **three arms on the same page in the same process, each one changing
+the frame, with the frame returning to the control's md5 byte for byte after each arm.**
+
+### The instrument (`LENA_MENUTEX` + `LENA_MENUUNLIT`)
+
+`patch_menutex.py` adds three things to `deck_dd7.cpp`, all inert unless the env var is set:
+
+* per-indexed-3D-draw print: the two **bound texture ids**, the stage-0/1 ops and args, the lighting
+  flag, and — for three of that draw's own vertices — the texel the shader *would* fetch, the vertex
+  diffuse, and **the fragment colour the port's own combiner predicts** (`a7_eval_texop` on the real
+  inputs, `a7_vk32.c:297`). A prediction is testable against the framebuffer; a list of inputs is not;
+* a **CPU snapshot of every uploaded texture** taken at `a7_upload_texture` call time — the exact
+  bytes the GPU was handed, so "the texture is flat" and "the sampling is wrong" are two lines;
+* `LENA_MENUUNLIT`: two file-triggered forced-input arms applied to indexed 3D draws only and
+  restored by a C++ scope guard, so no arm can leak into the 374 2D chrome draws after the car:
+  `/tmp/mtA` = stage0 `SELECTARG1(TEXTURE)` (texture only), `/tmp/mtB` = stage0
+  `SELECTARG2(DIFFUSE)` (vertex/material colour only).
+
+`out-md10/cmr2` md5 `8be469d8545f9252e5c27f44c5ca6499`. Build notes worth keeping: three of the
+four iterations were *compiler-caught* format/type errors in my own print (and `A7Material.diffuse`
+is an `A7ColorValue` of floats, not a `D3DCOLOR`) — the last build has **zero warnings from the new
+block**, and the first cut's budget was wrong in a way that would have printed the menu chrome and
+never the car, which is why `MENUTEX` now rides `MENUDRAW`'s burst window.
+
+### The run, and the route defect that cost the first 3 minutes of it
+
+`md_mtex`, card taken 15:21:03 (guard empty, no peer touched). **The first launch had no X-key
+driver and never left the boot screen** — `[MENUTEX]`/`[MENUDRAW]` = 0 lines for three minutes,
+because `md_drive_car.py` injects through `inject-key.py`, whose uinput device cannot be taken on
+this box (r7 measured it: score −2, or `Permission denied` on the evdev node). `kb_mt.sh`
+(`drive_cov.sh`'s phases 1–2 with the exit condition moved to my own first line) reached the option
+page **80 s after the keys actually arrived**. Every earlier round's route was driven by exactly
+this xdotool path.
+
+### What the car's draws actually bind (402 draw lines, 402 texture pairs, 1,206 vertex samples)
+
+* **Eight real textures**, ids 35,36,37,38,39,40,41,42 — 256×256, 512×512, 1024×1024, means
+  (13,13,12,207), (100,94,101,253), (51,50,50,207), (31,30,35,204), (22,22,21,187), (85,66,69,204)…
+* **No stage-1 texture at any of them** (`tex1=-1`), so the 3D fragment shader's stage-1 branch is off.
+* Stage-0 op at every draw: `MODULATE(TEXTURE, DIFFUSE)`; lighting on at 389/402.
+* The car carries **38 distinct vertex diffuse colours** (white, greys, 0xff926c6c, 0xffb3b34c,
+  0xff5f5f9f …) — real per-part colours, not a placeholder record.
+* The combiner's **prediction is near-black** (`ff000000`, `ff08090a`, `ff080905`, `ff080008`…), and
+  the framebuffer in the car's own region holds exactly that: `(0,0,0)` 3,344 px, `(49,52,49)`
+  2,162, `(0,0,13)` 991, `(8,0,8)` 969. **The car is not missing and not mis-indexed — it is painted
+  near-black, and the port's own arithmetic says so before the pixels do.**
+
+### The A/B — control, texture-only, diffuse-only, with recoveries in between
+
+| window | frames | md5 | distinct colours | car region |
+|---|---|---|---|---|
+| CONTROL 002–014 | 13 | `1b2bce5343` | 4,248 | dark: (0,0,0), (49,52,49), (0,0,13), (8,0,8) |
+| **mtA** texture-only 015–031 | 17 | `15525ebc90` | 3,730 | dark + greys (161,160,161), (150,150,150) |
+| recovery 032–042 | 11 | `1b2bce5343` | 4,248 | identical to control |
+| **mtB** diffuse-only 043–059 | 17 | `1ce176a776` | 155 | **34,233 px of PURE WHITE** |
+| recovery 060–071 | 12 | `1b2bce5343` | 4,248 | identical to control |
+
+Both arms fired (`[MENUUNLIT] arm 1 ACTIVE (draw 1)`, `arm 2 … draw 958`), both changed the frame,
+and **both recoveries returned it to the control md5**. Full pixdiff control→mtB is 32,092 pixels,
+**98.4 % of them pure white in mtB** — so the car's own silhouette is `bbox x[87..891] y[215..378]`,
+and with the texture removed from the chain that silhouette goes white: **the visible car in the
+control is the texture, modulated by a white diffuse.**
+
+### The one number r11 will NOT ship, and why it is the most interesting one
+
+The UV column printed `uv0=(3.3609e-309, 2.122e-314)` — **a double, in a column that reads a
+32-bit float** (smallest subnormal float is 1.4e-45). So the formatting is wrong and the *magnitude*
+cannot be quoted. What is quotable is the **constancy**: all 1,206 printed UV strings are identical.
+
+If that constancy is real it is the whole bug — every fragment of the car would sample ONE texel,
+which is "flattens into one flat piece of paper" literally, in the fragment shader. So it was
+checked against the file: the `.c3d`'s own 48-byte records (dumped offline this round from
+`game/Game/Cars/205a1N.c3d`, located by their unit-length normals, 1,140/1,268 gaps = 48) carry
+**real UVs** — `uv0=(0.5000,0.5000)`, `(0.9897,0.5000)`, `(0.9241,0.2552)` … at exactly the offsets
+the port reads. **File has UVs; the runtime read says one repeated value; and the column that says
+it is the one column I just caught being formatted wrong.** So `MENUTEX`'s UV column was rebuilt as
+**hex** (`out-md11/cmr2`, md5 `629228b9c3211556157004feddcb4987`) and re-measured in run 2
+(`md_mtex3`, launched 15:29), together with the depth question below. r11 does not get to claim it
+yet, and says so here rather than in a footnote.
+
+### Also in run 2, and it is a fork r10's numbers opened
+
+r10's drop test showed the car's presence costs the *page* ~140,000 pixels of its own content, and
+the car is drawn 4th–32nd of the frame — **before** the 374 2D chrome draws, so it cannot be
+painting over them. Depth is the obvious candidate (the car writes z, the TL chrome depth-tests
+against it): run 2 runs the same page with the existing `LENA_MENUZ=0` instrument, which forces
+`D3DRS_ZENABLE=0` around indexed 3D draws only and restores the game's value right after. The option
+page is deterministic (r10 measured byte-identical captures across frames, binaries and runs), so
+the cross-run md5 comparison is a valid A/B.
+
+**Frames pushed:** `frames/opt-preview_20261011-1524_r11_CONTROL_car-pixels-dark.png`
+(`658c57ddcfe2c1aa43fe0791d0ecf286`) — the page as he sees it; the same frame with the car's
+fragments forced to vertex/material colour,
+`frames/opt-preview_20261011-1524_r11_mtB_diffuse-only_car-WHITE.png`
+(`2f15d58f811c41facc922da90efa5caa`); and 880×300 crops of the car's own region from each
+(`eb121df8c6e058a004fc7e4babc4a7c0`, `f3677e42cb067fd19eaeaffa5500aac3`).
+
+Held for the next round: whether the runtime UVs are really one repeated value (run 2, hex), whether
+depth is what costs the menu its own content (run 2), and — if the UV constancy holds — **where the
+UV field is lost**, since the file has it and the port's record offsets are demonstrably right for
+position (offset 0), normal (12) and diffuse (24, written by the game's own `Mesh.cpp:95`).
+
+---
+
 ## installer + public face (2026-10-11 15:0x–15:2x EEST) — the shipped installer could not have worked, the pair did not compose, and the repo's face was not this game
 
 **The bug, reproduced on his own tree** (isolated `HOME`, nothing written to his
