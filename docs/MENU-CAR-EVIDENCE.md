@@ -18,8 +18,13 @@ the game's own source, and every claim says which.
    and it cannot have been, because no run that carried a `DECK_IDXTRACE` instrument ever
    displayed the option/setup screen.** Measured: the option-menu camera
    `eye=(0.14 -0.09 -5.00)` appears in **`owner1`, `owner2`, `owner3`, `owner4`,
-   `owner5`** and in **none** of `mk_raw`, `mk_sub`, `mq_raw`, `mq_sub`, `mp_sub`,
-   `mcafter_sub`, `idxtrace_race`, `idxfix_race`. So `MENU-CAR.md` §0.1's sentence
+   `owner5`** (12, 4, 16, 4, 2 hits) and in **none of the six trace runs that also carry the
+   camera instrument** — `mk_raw` 98 camera lines, `mk_sub` 99, `mq_raw` 160, `mq_sub` 160,
+   `mp_sub` 209, `mcafter_sub` 117, all with **0** option-menu hits. (The two trace logs
+   without the camera instrument, `idxtrace_race` and `idxfix_race`, have 0 camera lines
+   each, so they cannot speak to it either way and are not counted.) The complementarity is
+   exact: every log with `IDXTRACE>0` has 0 option-menu hits and every log with option-menu
+   hits has `IDXTRACE=0`. So `MENU-CAR.md` §0.1's sentence
    *"the pre-race / in-race menu car does NOT use the opposite index convention"* is
    **over-claimed**: what was measured is that the indexed draws of a run that never
    entered that screen are relative. §2 below says why the *conclusion* still holds — but
@@ -155,10 +160,11 @@ The per-draw detail lines (24 of them, the instrument's own first-24 cap) are qu
   `Race_LoadStageGeometry` (802) — the stage-load / race-start window, on the game's own
   attract route, which on this build goes frontend → stage load → race and stops nowhere;
 * the aggregate continues for the rest of the run (`mk_raw`: 620,000 draws with
-  `startVert!=0`; `mq_raw`: 958,000; `mp_sub`: 546,000), all `relOk`, `absOk=0`, and all of
-  it on runs whose camera set is `(-0.00 -0.00 -20.00)` (frontend) and the race cameras
-  (`(83.18 18.53 598.47)`, `(100.00 14.06 514.95)`, …). **No option-menu camera, in any of
-  them.**
+  `startVert!=0`; `mq_raw`: 958,000; `mp_sub`: 546,000; `idxtrace_race`: 404,000), all
+  `relOk`, `absOk=0`, and all of it on runs whose measured camera set is
+  `(-0.00 -0.00 -20.00)` (frontend) and the race cameras (`(83.18 18.53 598.47)`,
+  `(100.00 14.06 514.95)`, `(377.59 13.12 241.83)`, …) — **no option-menu camera in any of
+  the six that have the instrument**, counted line by line as above.
 
 `MENU-CAR.md` also quotes the trace as "40,000 indexed draws". No log here ends at 40,000;
 the nearest is `idxtrace_race.log` at 404,000 (the race round's own run). The quoted
