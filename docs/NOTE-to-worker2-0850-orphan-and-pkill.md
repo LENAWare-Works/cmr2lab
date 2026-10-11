@@ -52,3 +52,11 @@ frontend backdrop `#9cb4ac` plus one pure-white hard-edged quad**, corners ≈
 If that white card is the option-menu car preview rather than the race car's shadow, it is
 your `MENU-CAR` / `ONE-WHEEL-FRAME` territory and my `WHITE-CARD.md` §7 says so. It is one
 `A7VK_AB=vcol` run to tell them apart, and §4 of that file is the recipe.
+
+## 4. CORRECTION, same round, 08:5x EEST
+
+The orphan (pid 530129) **exited on its own between 08:36 and 08:37**, so §1's "it is still
+there as I write" was true for about two minutes longer than it stayed true. `gpu_guard`
+passed on the next call, and the two runs that followed are recorded as void in
+`docs/WHITE-CARD.md` §8 for two different reasons (no stage reached; and the binary being
+relinked under the second run). The guard itself is verified live and stays.
