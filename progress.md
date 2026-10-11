@@ -272,18 +272,47 @@ shader; `DIFFUSEMATERIALSOURCE = D3DMCS_MATERIAL` is still the last value, so th
 port's hardcoded material-source is right and the "use the vertex colour" fix would
 have been **wrong**. (`docs/DEATH-AND-LIGHT.md` §2)
 
-**The collapsed car on the setup screen. Measured fraction: 0 — no cause has been shown
-to be the cause.** What has moved is the list of things it is **not**:
+**The collapsed car on the setup screen. Measured fraction: 0 — no cause has been shown to
+be the cause.** What has moved is the list of what it is **not**, and two of those closed by
+measurement since the last rewrite (mine, `work/MENU-CAR-FLATTENED/`, run 11:0x–11:2x):
 
-* the option screen's 3D submits **9,628 draws and rasterises zero triangles**;
-* the index base is **not** it — the hypothesis is dead at the call site
-  (`startVert = vertexOffset + minIndex` on an array `Mesh_BuildParts` had already
-  rebased) and by enumerating all **ten** `DrawIndexedPrimitiveVB` call sites;
-* the phone's screenshot patch measures **10.9 % W × 10.0 % H** on that screen, and of
-  41 captures in that ticket **40 fall outside their own draw window** — the capture
-  latency (1–2 s of car per menu visit) is the binding constraint, not the analysis.
-* What is still missing is one thing: **a capture of the current default menu frame
-  taken while the car is up.** (`docs/MENU-CAR-EVIDENCE.md`, `docs/MENU-CAR.md`)
+* **The index base is not it — and the ticket's hypothesis is backwards.** Measured on the car
+  page itself, both arms, same binary, one env var apart (`out/md_car_raw.log` vs
+  `out/md_car_sub2.log`, `A7VK_IDXBASE=sub`):
+
+  | | default | `sub` (the old re-base) |
+  |---|---|---|
+  | indexed draws parsed | 3,012 | 3,036 |
+  | indices out of range as received | **0** | **2,778 (91.5 %)** — `65506, 65505, …` = −30, −31 |
+  | mesh NDC box (GEOTRACE) | x=[−0.811 0.741] y=[−0.422 0.460] | **x=[−76577.33 3.60] y=[−92242.79 20664.31]** |
+  | owner-map coverage on that page | 463–658 cells, 2,073 tris (18–25 %) | 21 cells, 48 tris (0.8 %) |
+
+  *"All mangled and jungled up into one flat piece of paper"* is what the **old** setting
+  produces, in the numbers. Reverting the fix to "un-break" the menu would create it.
+  Also dead: the format/stride theory (float48, part-sized, `idxInRange` yes on the default).
+* **The capture that this section used to call the missing piece now exists.**
+  `frames/md_car_raw.000.ppm` is run frame **8517** with **1,377 car draws in flight** — and it
+  is **96.417 % one colour (140,150,158), 232 distinct colours**. The car's own owner cells
+  (rows r14–r27, cols c8–c53 of the 64×40 map = **x 160–1080, y 280–560 px**) are empty in it.
+  So on the default arm the car is **submitted, textured, correctly transformed and invisible**;
+  one capture in 41 landing inside its window was the binding constraint, and it is now closed
+  for this page (`docs/MENU-CAR_car-frame.md`, PNG in `frames/`). All three of today's runs
+  agree: no capture anywhere, pre-fix or post-fix, has a car in it.
+* Same run, same frames, GEOTRACE (`[GEO] f=8460/8520/8580`): obj box
+  `x=[-2.1 2.1] y=[-0.5 0.7] z=[-0.9 0.9]` (a car), `w=[4.076 6.158]`, `ndc
+  x=[-0.811 0.741] y=[-0.422 0.460]`, `behind=0 nonfinite=0 draw_behind=0 draw_alloff=0`,
+  `tex=1377 notex=0`, and the render-state line is **identical** to the frames with no 3D at
+  all. Everything the software can see is right, which is why the answer is now narrowed to:
+  **the fragments are discarded after submission (alpha test, cull/winding, or a dead texture
+  binding) or written in the backdrop colour.** Next instrument: `A7VK_TEXDUMP` on the car's
+  own texIds (37/39/40/41/44) to read their alpha, or one run with alpha test forced off.
+* **One number in the previous rewrite is corrected here:** *"the option screen's 3D submits
+  9,628 draws and rasterises zero triangles"* is an artefact of reading a **cumulative** census
+  counter as a per-frame one. That screen draws ~675 parts/frame between frames ~2400–3600 (and
+  the car page 1,377–1,620 draws/frame at 8460–8580) and then the game stops calling
+  `DrawIndexedPrimitiveVB` on it altogether. The peer's 40-of-41-captures-outside-their-window
+  finding is real and is the reason the earlier frames could not settle it — but it is a
+  capture-latency fact, not a rasterisation one.
 
 **"A legible stage." Honest fraction: no measurable fraction on the picture — but the
 inputs to it are now correct.** The road textures draw (347,599 screens of `RD_GA`),
