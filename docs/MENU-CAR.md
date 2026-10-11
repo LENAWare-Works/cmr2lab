@@ -1,3 +1,15 @@
+> **CORRECTION, STAMPED 2026-10-11 08:3x (round `MENU-CAR-EVIDENCE-VISION`, worker 2).**
+> §0.1 and §1 below say the *menu car's own draws* were measured relative. They were not:
+> **no run that carried `DECK_IDXTRACE` ever displayed the option/setup screen** — the
+> option-menu camera `eye=(0.14 -0.09 -5.00)` appears in `owner1`…`owner5` only, and every
+> trace run's camera set is the frontend `(-0.00 -0.00 -20.00)` plus the race cameras. The
+> traced draws are a race car (seven signatures, repeated every frame from frame ≈2400 to
+> the end of the run). The §2 conclusion — no call site wants the old re-base — still
+> stands, and now rests on all **ten** `DrawIndexedPrimitiveVB` call sites instead of on one
+> run's arithmetic. The "40,000 draws / 1,358,988 indices" figures in §0.1 match no log in
+> this directory (nearest: `idxtrace_race.log`, 404,000) and should be re-taken before they
+> are quoted again. Full evidence: **`MENU-CAR-EVIDENCE.md`** §2 and §3.
+
 # THE MENU CAR AND THE INDEX BASE — the hypothesis is dead, and this is the measurement
 
 `work/RACE`, round **MENU-CAR-FLATTENED**, 2026-10-11 07:23–08:15 EEST.

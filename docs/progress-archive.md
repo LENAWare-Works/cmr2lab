@@ -1,0 +1,1667 @@
+# the append-log, archived 2026-10-11 11:1x EEST
+
+This is **all of `progress.md` as it stood at 10:28 today**, kept verbatim and
+unedited, because the record of how a thing was found is worth more than a tidy
+file. It is a reverse-chronological log: the newest block (`0l`) is at the top and
+the oldest (`0`, `0.5`) is near the bottom, and it was written by fourteen different
+rounds, each appending above the last.
+
+It is **history, not status.** Two things are true of it that are worth saying out
+loud before anyone reads a number out of it:
+
+* several of its claims were corrected *by later blocks in the same file* (`0z`
+  corrects `0y`-style corrections are the norm here, not the exception), and a few
+  are now plainly superseded — the GPU fault it lists as fatal was fixed at 23:09,
+  and the "the port draws no road" line was an instrument artefact;
+* the last status section it carried (`1. RIGHT NOW` / `2. DONE` / `3. IN PROGRESS`,
+  written 2026-10-10 ~14:40) was later spliced into by appends and is no longer
+  readable as one document.
+
+The live page is [`../progress.md`](../progress.md), which is rewritten whole each
+round so that no stale claim can sit above a fresh one. This file is where the
+old claims live, with their dates on them.
+
+---
+
+# progress.md — Lena on the Deck, reporting to Lena on the phone
+
+Rewritten **whole** at every checkpoint, never appended. If a line is not true at
+the timestamp below, it is not in this file. Every line answers "how do I know
+this" with a number, a path, or a test result — and where I could not answer it,
+the line is in §6 instead.
+
+**Last whole rewrite: 2026-10-10 14:54 EEST. §0 was appended at 15:15 by the
+pretty-frame worker; the rest of the file is that 14:54 rewrite, unverified by me.** This file is one commit — the rewrite
+that carried it is `git log -1 -- progress.md`, and it is rewritten whole, not
+appended, so there is never a stale claim above a fresh one.
+
+**Blocks §0, §0.5 and §0a were appended after that rewrite, each saying so at its
+own head. §0a has since been re-verified in place, with every change marked
+`CORRECTION` and a stamp at the top of the block.**
+
+**On provenance, because this rewrite is 26 minutes after the last one.** §1, §2.8,
+§3A and §5 are measured at 14:47, and one §6 bullet was added at 14:54. Everything else in §2 is carried forward from the
+14:17–14:28 rewrite and I did **not** re-run it in this pass; those lines say so
+where it matters. Nothing here has been re-derived from memory.
+
+Paths, so they line up on both ends:
+
+| short name | real path on the Deck |
+|---|---|
+| the install | `~/lena/.lena_cmr2/game` (**638 MB** retail PC install; 259 `.c3d`, 220 car containers. It said 2.26 GB here — that was the disc-image copies in `gamedata/`, corrected §0b/§6) |
+
+## 0l. THE MENU CAR, ROUND 2 — the index-base hypothesis is dead one call site deeper, the instrument it asked for now exists, and the GPU was somebody else's. added 2026-10-11 09:1x EEST by the `MENU-CAR-FLATTENED` worker; appended, nothing above or below it touched
+
+> **CORRECTION, stamped 2026-10-11 09:2x EEST. The peer worker `MENU-CAR-EVIDENCE-VISION` committed at 09:03 — after this block was typed — and it reads the option screen's own captures. Two sentences below were wrong when they were written and the numbers in them were wrong with them: *"there is no capture of the setup screen before or after the fix"* and *"the menu screen was still not reached"*. Both are corrected at the foot of this block, marked CORRECTION, rather than left standing above a fresher claim.**
+
+**One line: the menu car's indices are relative *by the call site's own argument list* — so the corrected default cannot be what broke it, the old default double-rebased the menu car too — and the leading mechanism is now the preview's own 32-byte 16.16 fixed vertices being read at a 48-byte float stride, which collapses every vertex into one place in arithmetic, not in argument.**
+
+* **Item 1, answered for the preview car and not for a race car.** `Graphics.cpp:7474` and `:7506` (the parts path, which is what a car mesh with parts uses) pass `startVert = pMesh->vertexOffset + pPart->minIndex` and `numVerts = pMesh->field_0x10 - pPart->minIndex`, while `Mesh_BuildParts` (`Mesh.cpp:233`) has already done `pData[k] -= minIndex`. The index the backend needs is `pData[k]` — **raw**. `Mesh_UploadVertices` (`Mesh.cpp:241-252`) sets `vertexOffset = vertexBufferFill[i]`, accumulating inside a 2000-vertex shared buffer, **so the preview car's `startVert` is not zero and the `A7VK_IDXBASE` switch does reach it** — the hypothesis was worth checking, and it is still dead. All ten call sites want raw; the old default subtracted a second time.
+* **The instrument the ticket asked for is written, compiled and linked, and it is off unless asked for.** `LENA-MENUDRAW` (specced in `work/RACE/MENU-CAR-EVIDENCE.md` §4, absent from the tree until now) prints per indexed 3D draw: `zeroBase=yes/no` — *a draw the index-base switch cannot have changed, on whatever screen it is printed on* — plus `idx[0..5]` **as the backend actually received them**, and the same vertex bytes decoded **three ways**: float48, fixed48 (16.16), fixed32 (32-byte packed). Patch: `tools/patch_menudraw.py`. Binary: `work/MENU-CAR-FLATTENED/out-md/cmr2`, md5 `5b1a1902cf65e46a4c116eadf33221a3`. **`port/rhi/deck_dd7.o` and `PLAY/out-plain/cmr2` are untouched by me** (both 08:53, `d26a0923a98ebb25b6da8b664275f87`) — the binary other workers are measuring did not move under them.
+* **Candidate C, with the arithmetic done rather than asserted.** The preview's converted vertices are **32-byte 16.16 fixed** (`Unk0x0082d220VertexFixed`, `GameInfo.cpp:1383`, built by `OptionPreview_AllocateConvertedWheelVertices`, `GameInfo.cpp:7727`) while the port's stride rule is `TLVERTEX ? 32 : 48` (`deck_dd7.cpp:1442`) and the mesh FVF `0x2d2` is 48. Read as IEEE float, `1.0000 -> 0x00010000 -> 9.18355e-41`, `4.0000 -> 3.67342e-40`, and **`-1.0000 -> 0xffff0000 -> nan`**: every coordinate within rounding of one point and every negative one NaN — flat, mangled, in one place. That is Miami's sentence with a number next to it, and one line of the new instrument separates it from a geometry or transform cause.
+* **The GPU was not mine to take, and that is a measurement.** At 09:00 the card held a live `out-plain/cmr2` (pid 588344, 08:57:12) with a `/tmp/snapnow` trigger loop firing every ~11 s, and a second one (pid 595534) had replaced it; `gpu-guard.sh --foreign` answered `588344` — a game alive that no harness here started. Two `cmr2` on one card is what wedged the display at 07:25. I started no third, and did not touch `/tmp/snapnow` or `/tmp/trig.ppm.*`: they were the peer `MENU-CAR-EVIDENCE-VISION-r2`'s, mid-campaign. **The next window is theirs; the instrument above is what it should be spent on.**
+* **No PNG of the menu car, and the reason is not that I forgot.** [CORRECTION 09:2x: the option screen *is* photographed — `work/RACE/out/owner1.02_t68.ppm`, `.03_t83.ppm`, `.04_t98.ppm`, 1280x800, pre-fix build, 07:20:40/07:20:56/07:21:12, option-menu camera — and the peer worker read them in their §11. What is true, and smaller, is that **no capture anywhere has a car in it**: those frames sit in the screen's zero-triangle window (§12), so they are 93.5 % one flat colour. I could not see them with the tools I had when I typed the original sentence.] The frames I could read myself are not it. `/tmp/trig.ppm.000-002` (the 08:57 session) are **95.5-96.1 % the frontend backdrop `(156,180,172)` with 96 distinct colours in the whole frame** — flat, no 3D in them; `/tmp/live1.ppm` is the opposite, **32,143 distinct colours**, dominant colour 0.317 % of frame, 165 of 960 grid cells over 255 distinct — a fully shaded full-screen 3D scene. Publishing either under the name "the menu car" would be worse than saying the picture does not exist.
+* **Offered, not claimed, to whoever owns those sessions:** both logged `[MSGBOX] CMR2 File Load Error: Make sure the CMR2 CD is in the CD drive` 11 s after start and their census has **no `0x2d2 MESH` draw line at all** (`draws by FVF: 0x1c4 TL=18198`). I am not calling that a regression off two sessions; I am recording that the binary he plays is the one relinked at 08:53 and that this is what it did on two launches.
+* **Not claimed:** [CORRECTION 09:2x: the setup screen has been reached and photographed — `owner1`…`owner5`, and the peer's §11 measures three of those frames; what *this* ticket has never had is a frame in which the car is drawn, which is a different and smaller thing. My original sentence here was wrong.] That the A/B is anything other than a race-frame A/B (it is), or that candidate C is proved (it is the leading survivor with its arithmetic done — the line that proves it has not been printed yet).
+
+
+**CORRECTION, added 09:2x after reading the peer's `6bc88b1` — and it sharpens this block rather than weakening it.** The peer measured what actually happens on that screen, from the owner map in `out/owner1.log`: at frame **3600** the option screen's **9,628 draws put 207,801 triangles** on screen with **711/2560 cells owned by 8 textures**; from frame **4000** the *same* **9,628 draws put zero triangles** there, camera unchanged at `eye=(0.14 -0.09 -5.00)`. So the menu car is not missing and not mis-based — **it is submitted and rasterises nothing.** That is degenerate geometry (a point, a line, a plate) or a degenerate transform, not a wrong index array: a wrong base makes *wrong* triangles loudly (91 % of the frame, §3), and a misplaced transform makes *displaced* ones. It is the strongest argument yet that the index-base question is closed, and it is the reason `LENA-MENUDRAW` prints the **object-space** bbox per axis first: a car-sized object-space box with a tiny screen box is a transform; an object-space box that is itself a point or a plate is the vertices, i.e. the deform path (§4 family B, which is where the peer put it too). One run of `out-md/cmr2` with `LENA_MENUDRAW=1` on a frame in that window answers it.
+
+Full round: **`docs/MENU-CAR-ROUND2.md`**. Patch and instructions: **`tools/patch_menudraw.py`**.
+
+## 0k. THE WHITE CARD UNDER THE CAR — the port takes the colour from the MATERIAL, and the car's shadow only has one in its vertices. added 2026-10-11 08:5x EEST by the `WHITE-BOX-UNDER-CAR` worker; appended, nothing above or below it touched
+
+**One line: on the 3D path the colour comes from the material, not from the vertex — `D3DRS_COLORVERTEX`(141) and `D3DRS_DIFFUSEMATERIALSOURCE`(145) are both DROPPED states and `a7_vk32.c:2623` hardcodes `flags.w = 0` — and the car's shadow is a draw whose colour *and* alpha live only in its vertices, with no texture by design.**
+
+* **The specimen, counted per pixel.** `work/RACE/out/death/control4.ppm.3000` (current binary, md5 `97a9eb3b08595858a563282596680401`) has **exactly 2 distinct colours in 1,024,000 pixels**: `#9cb4ac` 99.62 % and `#ffffff` 0.38 %. The white is **one hard-edged quad**, interior uniformly 255/255/255, corners ≈ **(583,382) (630,388) (576,450) (523,441)** — i.e. opaque, not a 20 % blend, and not a gradient.
+* **Why white is what comes out.** `out/ab/abfix.ppm.3590`, a frame the run's own log places in `A7VK_AB=notex` mode (`out/framing1.log:964`), is **1,024,000/1,024,000 px near-white, a single component, 100 % fill** — the whole frame. With textures out of the equation the 3D path emits white, because `base` is `b.matDiffuse` (`a7vk3d.vert`) and the game's single `SetMaterial` (`SetMaterial=1` in a whole 6 M-draw run, `out/death2.log`) left a white material there.
+* **The draw that owns the defect.** `CMR2Decomp/CarPhysics.cpp:451` `CarPhysics_DrawBodyWheelAndSkidShadows` queues `Quad2D_QueueFixedTriangle(0, &v0, &v1, &v2, **NULL**, (Quad2D *)10)` (`:418`): **no texture**, vertex colour **black**, alpha 0x32…0xff. So there is no texture to bind and no blend to blame — every channel it has is in the vertex, and the vertex is not read.
+* **The A/B is written, attempted twice, and VOID twice** (`card_probe` 08:37, `card2` 08:38: no `0x2d2 MESH` draw in either, i.e. the stage was never reached, so their frames cannot contain a car; the binary also moved under the second run, `97a9eb3b` -> `46ef5576` at 08:38). `tools/run_card.sh` now prints `NO STAGE -- ... the run is void for this ticket` by itself rather than letting a frontend frame be read as evidence. Nothing about the mechanism above depends on those runs; they are how the test failed, not what the finding rests on.
+
+**The fix direction is one state.** `CMR2Decomp/Graphics.cpp:3520-3566` `Graphics_SetLightingMode`: mode 3 is the only mode that asks for `D3DMCS_COLOR1`; the port answers `D3D_OK` and drops both states. `run_card.sh` measures it with `A7VK_AB=vcol` — the switch is already in the shipped binary, so **no rebuild is needed**, and the prediction is stated before the fact in `WHITE-CARD.md` §4.
+* **His eyes, in his words — the only review that counts.** Miami, 2026-10-11: *"textures were overall better tho"* — one driving session, on hardware, after the DXT5 blit fix. That is a person noticing, not a number, and it sits beside the texel-level evidence in §0g rather than replacing it.
+* **Not claimed:** that the specimen quad *is* his white box (it is a frontend screen — 99.6 % backdrop — and whether it is the race car's shadow or the option-menu preview is what the A/B decides); and not claimed that `flags.w` explains all of "LIGHTING IS ALL FUCKED UP". `WHITE-CARD.md` §7 has the full list.
+
+## 0i. THE CAMERA AND THE NEAR PLANE — the race camera is the game's own and is sane, `znear` cannot smear a frame, and the road's paint owns 12.3% of one. added 2026-07-11 07:5x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**One line: the framing was not the fault — `znear` is 0.877–5.694 against a far plane of 200, and `w_clip = z_view` in this projection, so there is no `znear` term in NDC x or y at all; 100% of a race frame is stage geometry, and `RD_GA` (texId 102) owns 12.3% of one.**
+
+Full write-up and the four frames: **`docs/CAMERA-AND-NEAR-PLANE.md`** and **`frames/`**. The
+three numbers the line rests on:
+
+* **Where the in-race camera comes from.** `Scene_SetViewFromCamera` (`SceneNode.cpp:2503`)
+  inverts the camera **node's** world matrix into `D3DTRANSFORMSTATE_VIEW`; the near plane and
+  the zoom are exported per frame out of the blended camera record by `View_BlendCameraStates`
+  (`Car.cpp:8377`) into `View_SetPlayerProjection` (`FixedPoint.cpp:718`). There is no separate
+  race camera path in the port — the race sets the same three transform states the frontend
+  does, and the port latches all three.
+* **The eye is 3–50 units above the ground.** An earlier note read the VIEW **translation row**
+  as the camera position and got `y = −21.8`, i.e. under the ground. For a rigid row-vector view
+  matrix `eye·R = −t`; corrected, that same frame's eye is **(83.18, 18.53, 598.47)** looking
+  along `(0.994, 0.002, −0.113)`. The instrument now prints the eye directly.
+* **A coverage number that clips.** `tu_note` caps near-plane straddlers at 100 screens and
+  `gt2_note_cover` adds no area for any triangle not wholly inside NDC; neither clips. The new
+  one (`A7VK_OWNER=1`, inert when unset) clips against the eye plane and the viewport, then
+  z-buffers into a 64×40 grid keyed by texture id, resetting **every present**. Result: 100% of
+  every race frame is 3D stage geometry; `RD_GA` 12.3% of frame 3150; `KEN_1A` 33.0%.
+
+**Not claimed:** a legible road with verges, a car, a HUD or a timer. One class of attract shot
+puts three parked-car panel textures across the whole frame at 6.9–10.1 units, which is what
+"abstract mush with one edge" was; whether those cameras are the right cameras is not answered.
+
+## 0h. NEITHER SIDE OWNED IT — the road textures ARE asked for and ARE bound; the port drew them from the wrong vertices. added 2026-10-11 06:0x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**One line: the game asks for `RD_GA`/`MRG_KN*`/`MOU_TER4A`/`TER_421C` on every frame of
+a race and the port binds exactly those textures — the fault is one line lower, in
+`DeckDevice7::DrawIndexedPrimitiveVB`, which re-bases index arrays that `Mesh_BuildParts`
+had already re-based; of 404,000 indexed draws with a non-zero base, 404,000 (100.00 %)
+fit the game's convention and 0 fit the port's.**
+
+Full write-up: `docs/ROAD-TEXTURE-OWNER.md`. Every number is from tonight's runs, **12 →
+12 GPU ring timeouts in all seven**, a race reached in every one.
+
+### The question, and the answer that is not (i) or (ii)
+
+The round was handed: *of the 40+ Kenya track textures only `TER_KN4A` and `GR_001` are
+ever bound in a race; every `RD_*`/`MR_*` has cov=0.0 and draws=0 — is that the game's
+material selection, or a query the port answers wrongly?* The instrument that decides it
+(`DECK_TEXREQ`, joined on the **surface pointer**) says:
+
+```
+RD_GA.DDS  slot 88 -> texId 102:   game asks 1288    port binds 1288    skip 0
+                                   port draws 2000    port coverage 0.0 screens
+```
+
+**The game asks** — 1,288 requests for `RD_GA` in one window, `partsSlotNull=0`,
+`oob=0`, and the mesh-level trace names the part tables (`[p0 slot=81 name='…TER_KN4A.DDS']`).
+That rules out the c3d trailer index, the submesh split and the track's material table.
+**The port answers correctly** — the surface the game hands to `SetTexture` is the
+surface the port uploads and ids, and `a7vk_combo_set` keys its descriptor set on the
+texId, so a draw samples its own texture. What the port then does with it is the bug:
+
+```c
+/* "D3D's indices are absolute into the vertex buffer" — they are not. */
+idxScratch[i] = (uint16_t)(idx[i] - startVert);
+...  v->data + (size_t)startVert*stride ...      /* the two cancel: startVert is lost */
+```
+
+`Mesh_BuildParts` (Mesh.cpp) already does `pData[k] -= minIndex` and
+`Graphics_DrawMeshPartsByTexture` passes `startVert = vertexOffset + minIndex`, so the
+array handed to the driver is already relative. Measured (`DECK_IDXTRACE=1`, one run):
+`draws(startVert!=0)=404000  rawInRange=15969393/15969393  usedInRange=349174
+relOk=404000 absOk=0`, with the giveaway line
+`startVert=840 numVerts=116 numIdx=156 raw[0..115]` — indices that are *exactly* the
+window they were handed for.
+
+### The old cov=0.0 line was an instrument artefact, twice
+
+`A7VK_TEXUSE` printed only the **top ten** ids by coverage (all ten taken by near-plane
+blow-ups) and selected them by **`cov > 0.0`** — which hides a texture that was bound and
+drawn 2,000 times and added no area. Two additive patches (`patch_texuse4/5.py`) lift
+both filters; a third (`patch_texuse6.py`) reports *why* each draw added nothing.
+
+### The fix, A/B'd in one build, and what it changed
+
+`A7VK_IDXBASE=sub` restores the old path; the default is now the corrected one.
+
+| | before | after |
+|---|---|---|
+| `RD_GA` (id 102) port coverage | 0.0 screens | **347,599.57 screens** (same 2,000 draws) |
+| `MRG_KN1` / `MOU_TER4A` | 0.0 / 0.0 | 237,993.76 / 210,545.06 |
+| frame at t=78, clear-colour pixels | 57.9 % | **0.0 %** |
+| frame at t=78, distinct sampled colours | 817 | **2535** |
+
+The road textures now own the largest coverage in the frame instead of none.
+
+### What is deliberately not claimed
+
+**The picture has not been checked against a reference.** What is measured is that the
+road's draws project real area and the frame is no longer more than half clear-colour.
+Whether the framing and the near plane are what a Kenya stage should look like is the
+next question, and it needs a picture beside the numbers.
+
+### Inertness, and his binary
+
+`work/PLAY/out-plain/cmr2` = `work/RACE/out-texreq/cmr2` =
+**`b960621bcc5657e135640e35aa70869f`** (previous, `e43d7a1e…`, kept as
+`cmr2.bak-pre-idxbase-20261011`). With every new variable unset: **0 lines** from
+`[TEXREQ]`, `[IDXTRACE]`, `[TEXUSE]` and `[SURF]`, stage still reached
+(`0x2d2 MESH=417596`), no window left on his desktop, no stray process.
+
+---
+
+## 0g. THE PAINT IS FIXED. added 2026-10-11 04:3x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**One line: every stage texture is DXT5 and the port was copying the *compressed
+blocks* into a 32-bit texture as if they were pixels — `DeckSurface7::Blt`, reached
+from `CGraphics::LoadDDSTexture`, did no format conversion, and a real DirectDraw
+driver does exactly that conversion, so the fix is seven lines of port code and a
+decoder — and with it the Kenya terrain renders in its own colour where it rendered
+chromatic noise.**
+
+Full write-up: `docs/DXT-COPY-PATH.md`. Every number below is from tonight's runs
+`tx1`–`tx8`, **0 GPU ring timeouts, 12 → 12 unchanged in every run**, a stage
+reached in every one.
+
+**The copy path, named and joined end to end** (from the new `DECK_SURFTRACE`
+FourCC report plus `DECK_FE_TRACE` naming the texture):
+
+```
+[TEX] DDS .\Game\Tracks\KENYA\KENlo.DDS 64x64 fcc=DXT5 ... linearSize=4096
+[SURF] CREATE 64x64 caps=0x401808 ... FOURCC=0x35545844 (DXT5) linearSize=4096
+[SURF] BLT dst=0x2ae9010(64x64 fcc=00000000 bpp=0) <- src=0x2cd18f0(fcc=35545844) srcbytes=6465000000000000
+[SURF]  ST_UPLOAD 0x2ae9010 64x64 pitch=256 id=-1 wroteByGame=0
+```
+
+Those two pointer sets — the surface the game writes and the surface the RHI
+uploads, which §0f could not reconcile — are the two ends of **one blit**. And
+`srcbytes=6465…` is `a0=0x64, a1=0x65`, the first DXT5 block, read at blit time:
+nothing had decoded anything. **All 181 stage DDS textures are DXT5** (`181 DXT5`,
+zero of anything else); the frontend and the cars are **TGA**, decoded in software
+by the game, which is exactly why only the stage was wrong.
+
+**The off-disk control.** `KenLot.bfl` is 370 entries, every one `DDS ` magic,
+64×64, **DXT5**, 128-byte header + 4096 block bytes — the arithmetic is
+self-consistent, so the read was never the fault. Decoded, they are terrain:
+`ter_kn4a.dds` mean RGB **(116, 89, 17)**, alpha **255 on 4096/4096 texels**. The
+decoder was checked against **ffmpeg**: **alpha identical on 4096/4096 texels of
+every file tested**, RGB to within 1 LSB, and both 1-LSB decisions were settled by
+measurement (565→888 by bit replication; DXT5 uses the 4-colour interpolation even
+when c0 ≤ c1 — on `kenlo.dds` block 62 ffmpeg's second colour is `(2A+B)/3 = 129`,
+not the midpoint 160). And the dumped upload is reproduced from the file:
+**`kenlo.dds` + the game's own row loop = 100.00 % of 4096 texels.**
+
+**The alpha question had no second answer — it was the same fault in another
+channel.** No blend state was touched and none was needed. Stage textures went from
+mean alpha 75–154 of 255 and 18–85 % zero-alpha texels to **255 and 0.0 %**, and the
+terrain's own texture decodes to alpha 255 everywhere. The remaining wash on the
+frame is not a bug: it is the game's own dust.
+
+**What paints the frame now, named** — a new instrument, coverage per bound texture
+id (`A7VK_TEXUSE=1`), which existed because after the fix the frame is a *picture*
+and colour statistics cannot say what is on it:
+
+| texture | coverage | what it is |
+|---|---|---|
+| `TRACKTEX\PCLOW\TER_KN4A.DDS` | 1,689,012 | **the terrain** |
+| `NEWIMAGE\DustCld\23_5\D_000..007.DDS` | 9,951–17,387 each | 8 dust clouds |
+| `NEWIMAGE\skid\skids_blank.DDS` | 124,301 | skid marks |
+| `KENYA\OBJECTS\PCLOW\BLD_30A.DDS` | 5,451 | a building |
+| `NEWIMAGE\GRASS\GR_001.DDS` | 2,025 | grass |
+
+**And the measurement that says the terrain is now painted with its own texture:**
+the ground band of the race frame has mean colour **(115, 90, 15)**; the texture it
+is drawn with is **(116, 89, 17)**. The same band before the fix was (142, 171, 159)
+— noise. The whole frame went from 268,522 distinct colours in 385,323 pixels to
+22,187 in 589,792.
+
+**What is still wrong, and it is the next order — the road's own textures never
+reach a draw.** Of the 40+ Kenya track textures loaded and uploaded, only
+`TER_KN4A` and `GR_001` are ever bound in a race; every road texture —
+`RD_K520B`, `RDKN_T1`, `RD_GA/GB/GC`, `MR_*` — is `cov=0.0, draws=0`, and **stage 1
+is never bound at all** (`drawsBoth=0` for a whole run). Whether that is the game's
+material selection or a selection query the port answers wrongly is not answered.
+
+**A correction to the block below, because a document people trust must not carry a stale line without saying so.** §0f ends "still `b46d80fee5489834b87f843fd15484e0`, 66/66 game objects" — true at 02:14. It is now `e43d7a1e…`, and it is **not** 66/66 this round: `Graphics.cpp` is the one game source file changed and it carries a `DECK_FE_TRACE`-gated texture-name trace (additive prints, no logic, nothing written). `out/clean.log` measures them inert — 0 lines from every instrument with the env unset, stage still reached.
+
+**Miami's binary has it:** `work/PLAY/out-plain/cmr2` is now
+`e43d7a1e4279fe2c05647c7c053d4fd3`; the old `b46d80fee5489834b87f843fd15484e0` is
+kept beside it as `cmr2.bak-pre-dxtblt-20261011`, one `mv` away from reverting.
+
+---
+
+## 0f. WHAT A RACE IS ACTUALLY ASKED TO DRAW — and what it drops. added 2026-10-11 02:2x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**§0e said: a stage runs, the picture is not a road.** This block answers the
+question that sentence left open — *what is the RHI being asked to draw during the
+race loop, and what is it dropping* — and it narrows the fault from "the stage is
+not drawn" to "the stage is drawn white, opaque, in the right place, and the
+texture that would make it a road arrives non-image-like and half transparent".
+
+Full write-up: `work/RACE/WHAT-IS-DRAWN.md` (on the Deck). Every number below is
+from the game's own binary tonight, in runs `geo1`–`aw1`, **0 ring timeouts**.
+
+**Asked to draw, per frame, frontend vs race** — frontend 2D draws 336 → **race 5**;
+frontend 3D mesh draws **0** → **race 286**, 19,415 vertices, 5,358 fully-on-screen
+triangles, **21 screens worth of triangle area**. The family that takes over is the
+indexed T&L mesh path, and with it switched off at record time the frame is the
+clear colour and nothing else (99.8–100 %): **the 3D path is the entire picture.**
+
+**Two things fall out of a frame-scheduled A/B done inside ONE run** (four states of
+the same moving scene ~1 s apart, so nothing is a run-to-run difference):
+
+* **without its texture the geometry renders flat opaque WHITE over 32.5 % of the
+  frame.** Geometry, transform, culling, rasterisation and compositing all work.
+  The failure is not geometry.
+* **every 3D draw in a race is submitted with `ALPHABLENDENABLE=1` and
+  `ALPHATESTENABLE=1`** (all 34,327 draws in a 120-frame window), blend factors
+  SRCALPHA/INVSRCALPHA, and 100 of the 286 per frame have ZWRITE off. The road is
+  being drawn as a ~40 %-opaque wash, 21 screens of it per frame.
+
+**Dropped, now with the values the game asked for** (the census printed counts
+before, not values): `CLIPPING=1`, `COLORVERTEX=1`, `EMISSIVEMATERIALSOURCE=1`,
+`TEXTUREFACTOR=0x75000000` (**new in the race**, unmapped), and
+`TEXTURETRANSFORMFLAGS=0` = DISABLE — so projected texture coordinates are not in
+play at all. One correction worth keeping: **`DIFFUSEMATERIALSOURCE=0` =
+`D3DMCS_MATERIAL`, not COLOR1** — the port's hardcoded material colour source is
+right, and the obvious-looking fix "use the vertex colour" would have been wrong.
+
+**Where it now lives: the stage's textures.** Dumping every texture the RHI
+uploads: the frontend's arrive 90–100 % self-similar (images, masks with alpha —
+correct); the stage's arrive **0.3–2.1 % self-similar, ~25 % of texels one single
+constant colour, mean alpha 75–154 of 255**. And the port is not lying about the
+format — the game asks for 32-bit textures, gets pitch = 4·w, and writes densely
+(13,004 of 16,384 bytes, all 64 rows). The surface the RHI **uploads from is not
+the surface the game wrote**, so the copy between them is the next question.
+
+**Three plausible hypotheses were killed by measurement rather than by argument,
+and are recorded dead:** the composed W/V/P is correct (WORLD identity, VIEW rigid
+and orthonormal, PROJ a textbook D3D perspective, printed as the game set them);
+projective UVs are not in play; and nothing in the draw path is refused
+(`refusedFvf=0`, `clamps=0`, `refused_by_backend=0` in every race census).
+
+**Not moved:** the picture. `work/PLAY/out-plain/cmr2` and `out-race/cmr2` are
+still `b46d80fee5489834b87f843fd15484e0`, 66/66 game objects, and the two
+instrumented RHI objects in the tree are inert unless their env vars are set.
+
+---
+
+## 0e. A STAGE IS REACHED — the frontend hands off and the game loads and runs one. added 2026-10-11 00:1x EEST by the `work/RACE` worker; appended, nothing above it touched
+
+**The wall every previous round hit is down, and it was two walls, one behind the
+other. This block corrects the line "it does not yet draw a *track*, a *car you can
+drive*, or a *menu you can click on*": the game now loads a stage off disk and runs
+it. It still does not draw a road.**
+
+**The crash was not the game.** `cmr2` hung the GPU's graphics ring ~30 s into every
+run and the kernel reset the whole GPU, thirteen times on the 10th. Two lifetime
+bugs in our own `rhi/a7_vk32.c` (a texture image freed with no device wait; the
+frame's own command buffer re-recorded while in flight). 6 edits, measured A/B on
+the **kernel log**: unpatched +1 reset per run, patched **0** in 95 s / 165 s runs
+(`work/RACE/GPU-RESET-FINDING.md`). Since then: **0 ring timeouts across five
+further runs tonight.**
+
+**With that gone, the frontend walks itself to a stage.** No input beyond one
+keypress to clear the legal notice: `FrontendMenu_UpdateMain` fires **30.5 s** after
+the main menu is entered, builds the DEMO profile, switches the game to in-race
+mode, and:
+
+```
+[STAGE] Race_LoadSelectedStage entered
+[STAGE] stage file '.\\Game\\Tracks\\KENYA\\KENlot.bfl': didFileLoad=1 size=2400320
+[STAGE] Race_LoadSelectedStage -> 1
+```
+
+That is the retail game's own stage loader returning 1 with a real stage file
+(**Kenya, 2.4 MB**). The in-race machine then runs, and it is **live**: its race
+loop advances `0 → 1063` updates in 44 s (~25 Hz), one car in the order, race flag
+set, still advancing when the run was cut.
+
+**And the draw picture flips completely at the handoff** (census every 300 frames,
+`DECK_DD7_CENSUS=1`):
+
+| phase | mesh-FVF `0x2d2` draws /frame | `DrawIndexedPrimitiveVB` /frame | triangles /frame | 2D TL /frame | ignoredStates /frame |
+|---|---|---|---|---|---|
+| frontend | **0** | 0 | 694 | 336 | 48 |
+| **stage running** | **229 – 289** | **162 – 208** | **3 867 – 4 591** | **5** | **896 – 1 171** |
+
+Whole-run mesh-FVF totals: **618,958 / 979,739 / 1,069,996** in three runs, against
+**0** in every frontend-only run this project has taken, `refused_by_backend=0`.
+The 3D path is driven by the game's own stage camera, every frame.
+
+**The wall that remains, and its family.** What reaches the swapchain is the
+backdrop colour with a large animated garbled region — no terrain. The number that
+names it: **ignoredStates 48/frame → ~1,100/frame, 20×**, i.e. the dropped
+render-state set (S2a: `COLORVERTEX`, the material sources, TSS
+`TEXCOORDINDEX`/`TEXTURETRANSFORMFLAGS`/`MIPFILTER`/`MAXMIPLEVEL`) is now being fed
+by the **stage** instead of only by the frontend. Same family as S2a. Not the GPU
+family — that one is closed. Separately: the demo car sits in call state 8 (take
+controls from the player) instead of 9 (attract-mode AI), so nothing drives it yet.
+
+**Method, because it is the reusable part.** Game state cannot be inferred from a
+draw count — "no mesh draw", "the key never arrived" and "the menu never moved" are
+identical from outside. So this round put a gated trace **inside the game's own
+code** (20 one-liners, `DECK_FE_TRACE=1`, no logic touched): frontend menu state,
+every stage-lifecycle entry with `Race_LoadSelectedStage`'s return value, resource
+mode changes, the in-race machine's state/level, every successful state promotion
+with the value that caused it, and the race loop's own counters.
+`work/RACE/patch_fetrace{,2,3}.py`, report `work/RACE/STAGE-REACHED.md`.
+
+## 0c. S2 MEASURED — THE STATE TRACKER IS NOT THE MOUNTAIN. added 2026-10-10 19:0x EEST by the `seq-s2-first` worker; appended, nothing below it touched except the two §6 lines marked CORRECTION
+
+**The phone's call was "S2 before P2". Agreed — and the measurement changes what
+S2 *is*, which is the reason to say so before spending a week on it.**
+
+I put a call census inside the port's own device (`rhi/deck_dd7.cpp`,
+`DECK_DD7_CENSUS=1`) and ran **the game's own binary** (`work/S2/build/cmr2`,
+i386, link exit 0). Two runs, 20 s and 28 s:
+
+| | 20 s run | 28 s run |
+|---|---|---|
+| presented frames | 1,126 | 1,606 |
+| draws / triangles | 77,287 / 159,414 | 205,714 / 426,806 |
+| **distinct pipelines** | **1** (built=1, hit=1125) | **1** (built=1, hit=1606) |
+| draws refused by the backend | **0** | **0** |
+| draws through the mesh FVF `0x2d2` | **0** | **0** |
+| mesh vertex buffers created | 206 (469,890 vertices) | same |
+| **state calls answered `D3D_OK` and dropped** | **29,512** of 99,704 | — |
+
+So: **the state tracker + pipeline cache that PORT-PLAN calls "the mountain"
+already exists and works** — 1.33 M draws collapse to one pipeline because the
+key is a 9-field struct snapshotted at draw time, which is the design working, not
+a cache that never fired. What the game can reach today draws **only** FVF
+`0x1c4` (screen-space TL); the 3D vertex buffers are built at load and **never
+drawn through once**. The port plan's sentence "what draws today is the
+frontend's path" is now a number.
+
+**What is actually missing is state FIDELITY, and it is already leaking.**
+`work/S2/d3d_census.py` (published as `tools/d3d_census.py`) compares every state
+the game names against `map_rs`/`map_tss` in the device: **10 of 18 render states
+and 10 of 19 texture-stage states are dropped** — `COLORVERTEX`,
+`DIFFUSEMATERIALSOURCE` (+3 material sources), fog colour/start/end/table/vertex
+mode, `NORMALIZENORMALS`, `LOCALVIEWER`, `TEXTUREFACTOR`; `TEXCOORDINDEX`,
+`TEXTURETRANSFORMFLAGS`, `MIPFILTER`, `MAXMIPLEVEL`, the five `BUMPENV*`. That is
+the lit-mesh path's whole vocabulary. For 2D it mostly costs nothing; for a car on
+a stage it is the difference between shaded and flat.
+
+**And the drop list is now measured rather than inferred.** The census names the
+state, not just the total (20 s run): `136` CLIPPING **9,049** calls, `141`
+COLORVERTEX and `145` DIFFUSEMATERIALSOURCE **4,525** each, plus the other
+material sources, ANTIALIAS, TEXTUREPERSPECTIVE, FILLMODE, STIPPLEDALPHA,
+COLORKEYENABLE, EXTENTS — and on the texture stages `t11` TEXCOORDINDEX, `t18`
+MIPFILTER, `t20` MAXMIPLEVEL, `t24` TEXTURETRANSFORMFLAGS at **2,878** calls
+each. That is the source list confirmed by a second method, at runtime, with
+counts. Two entries in the source list (**fog colour/start/end, and the
+`BUMPENV*` block**) do *not* fire on this path — fog sits behind
+`Graphics_GetDeviceCaps90()`, bump-env behind a texture configuration this run
+never enters. They are still gaps; they are not being hit yet, and saying which is
+which is the difference between a list and a scare.
+
+### The two census numbers settle like this — and the README was RIGHT
+
+**278 and 298 are the same census at two scopes, not two answers.**
+
+| scope | sites | methods | draws | state |
+|---|---|---|---|---|
+| `pD3D->` (the device) | **278** | 20 | 22 | **256** |
+| `pD3D->` + `pDD->` (the D3D7 object) | **298** | 26 | 22 | **276** |
+
+* The README's **278 / 20 / 256 / 22 is correct as published. Do not change it** —
+  just keep the scope words beside it (`pD3D->`, the device the game draws
+  through).
+* **CORRECTION to §6 below:** "277 of 298" is `298 − 21`; there are **22** draws
+  in that scope (it misses the one `pD3D->DrawIndexedPrimitive`). The line is
+  **276 of 298**.
+* **518 is not reproducible and I am not replacing it with a fourth definition.**
+  Counted now: every `x->Method(` in the tree = **533**; a D3D7-method-whitelisted
+  count = **400**. Quote 518 with its scope or drop it (§6 of `docs/PORT-PLAN.md`
+  now says so).
+* And the count is not comment text: blanking `//` and `/* */` first gives the
+  same 278/20/298. A regex that stops at the first identifier gives 275 — it loses
+  every call written `m_pTextureManager->pD3D->Method(...)`. That is how a census
+  quietly stops meaning anything.
+
+### The verdict on the "smaller first milestone"
+
+Right instinct, wrong lever. **There is no pipeline-per-combination work to
+hardcode** — one pipeline served 1.33 M draws, and the cache already generalises
+what a hardcoded table would special-case. The blocker is not pipelines: it is
+(a) the dropped states above and (b) **reaching a race at all**. I drove the game
+from the attract loop with the pad (12 presses) and never saw a mesh draw, so a
+"one real 3D frame" milestone has to start from *getting the game to a track*,
+which is a game-state problem, not an RHI one. S2 therefore splits: **S2a = state
+fidelity** (measurable today: `ignoredStates` → 0, printed per run) and **S2b =
+reach a race** (where the picture actually is).
+
+### Sequencing, and the P2 question
+
+**Agreed: S2 before P2**, for the reason the phone gave — S2 is where the unknowns
+were. They are now smaller than modelled, and P2 is now the bigger pile. But
+**I did not start P2 in parallel, and I would not**: not for file conflicts (P2
+touches 33 game files, S2 touches `rhi/`) but for the **object set**. P2 widens
+headers, which invalidates every prebuilt object exactly as P3 did; the one
+artifact that makes all of this measurable — a game binary that links (66/66,
+link exit 0) — would go mixed-header under it. If P2 starts while an S2 evidence
+run is live, it must run its own sweep directory and must not relink the game
+binary until it lands. Then both lanes stay real.
+
+**Not done, on purpose:** no dropped state was implemented this round (they get
+implemented against the census, not against a screenshot), and no attempt to
+finish the menu navigation. **One path correction, since every command in the reports above uses it:** the port
+working tree is `~/lena/.lena_cmr2/` — with the `lena/` in it. Two older lines in this
+file write it as `~/.lena_cmr2` and that path **does not exist**; a command copied
+from them fails with "No such file or directory" and looks like the tree was deleted.
+It is not: `ls ~/lena/.lena_cmr2/port/rhi/`.
+
+Full evidence, raw logs and the two supporting fixes
+(`a7_vk32.h` was missing `extern "C"`; the device's own `draws` counter only
+counted one of the four draw entry points): `work/S2/README.md`.
+
+## 0a. THE MIRRORED FLANK — CLOSED. added 2026-10-10 18:27 EEST — cited by *subject*, not by hash, because this repo is rebased onto `origin/main` under it: `git log --oneline --grep='flank mirroring'` finds it (it said 18:35 EEST here at first, later than the commit that carried it; corrected in the re-verification pass)
+
+**Question, from the phone, and nobody else's queue:** in the 4-car frame and the
+single 205 frame the decals on one flank read correctly and the lettering on the
+other looks MIRRORED. Is that faithful to the original game, or is it a bug in our
+texture binding?
+
+**ANSWER: FAITHFUL. It is in the file, and the engine draws the file. Not a
+binding bug. Closed — no fix, and a "fix" would be a regression.**
+
+**This block, too, is appended by a worker who is not the author of the rest of
+this file.** Everything below §0a is carried forward untouched. The one edit I
+made outside this block: the path table above had lost its last row into the §0
+heading; I completed that row with the install path I actually measured against
+(`~/lena/.lena_cmr2/game`), which is all it was missing.
+
+**Re-verified and corrected 2026-10-10 18:31 EEST by the second worker on this same
+job** (the first pass committed and then ran out of steps; it left no checkpoint, so
+this pass re-derived everything instead of trusting its notes). All of the commands
+below were re-run on the Deck and the engine paragraphs were re-read in
+`~/.lena_cmr2/upstream/CMR2Decomp`: `Game_DrawMeshTextureRuns` (`Game.cpp:2114`) binds
+the file's own per-triangle texture and nothing else; `SetTexCoordIndex`
+(`Graphics.cpp`) sets `D3DTSS_TEXTURETRANSFORMFLAGS, 0` on every path it takes.
+**The verdict is unchanged — FAITHFUL, not a binding bug.** Three things in this block
+were wrong and are marked `CORRECTION` inline: one over-claimed line about one-sided
+textures, one row of the sample vertex table that was a mis-paired vertex, and the
+header time. `tools/flank_mirror.py` grew a `BODIES` mode and a `PAIRS` dump so the
+headline numbers now reproduce **verbatim** from the command list, which the earlier
+list did not actually do.
+
+Commits, if a hash is wanted: `git log --oneline --grep='flank mirroring'` gives the
+two round-1 commits and `--grep='mirror-flank: re-verified'` the round-2 one. Hashes
+moved twice while this block was being written (an earlier draft cited `49d45ad`,
+which no branch points at now) because another session is pushing to `main` — hence
+the subjects above. `git ls-remote origin refs/heads/main` is the check that a push
+landed.
+
+### The three questions the phone asked, answered in order
+
+**1. Does the engine mirror a body panel?** No — and there is no code path that
+could. `Game_DrawMeshTextureRuns` (CMR2 `0x0049c510`) walks the mesh's own
+triangle list and, per triangle, binds
+`*(int *)((BYTE *)pTri + 4 + pTri->field_0x2c * 4)` — the file's own texture
+index — then `DrawIndexedPrimitiveVB(D3DPT_TRIANGLELIST, ...)`. The only
+transform applied to the vertex data is the node's world matrix
+(`SetTransform(D3DTRANSFORMSTATE_WORLD, pNode->worldF)`, `Game_DrawViewMaskNode`
+`0x0049cad0`; `Graphics_DrawMeshLOD` `0x0049c940` is the wrapper). No UV
+transform, no per-side texture selection, no mirror flag on a mesh.
+The engine's *only* mirror is `StageObject_RebuildMirroredTiltMatrix`
+(`0x00486910`), and reading its basis swap — `right' = forward`,
+`forward' = -right`, `up' = up` — gives determinant **+1**: it is a 180° rotation
+about the up axis, **not** a reflection, and it is used for view/camera records.
+The car's own wheel nodes in the file are that same rotation
+(`205a1N` nodes 1–4: `diag(-1,1,-1)`, translation ±0.717/±0.718 in z), which is
+how a wheel is placed on the other side without flipping anything.
+
+**2. Is the left flank a mirrored instance of the right?** No. Both flanks are
+real, separately tessellated geometry in the same file, under identity scene
+nodes. `205a1N`: the body parts span z ∈ [-0.88, +0.88] with triangles on both
+sides (`08BodySim` 101 faces at z>0.3, 83 at z<-0.3; `08BodySim` has V=247, an
+odd count — the two flanks are not copies). Every body part's node is the
+identity matrix, so the mesh data *is* the world data for panels.
+
+**3. Is there a distinct LEFT texture in the trailer?** No. Over the 259 `.c3d` in
+the install, **192/205 files with flank triangles use the *same* body/livery
+texture on both flanks** (measured: the texture with the most triangles is in both
+the left-flank and right-flank index sets). Over the **23 `*a1N` exterior car
+files — the set that carries a livery, and the set in the frames — it is 23/23**,
+printed by `BODIES` below. The 43 files whose left/right *sets* differ do so by one
+underside / glass / single-panel index that my `|Nz| > 0.75` threshold caught on
+one side only — the `a1N` five are `ap5unddf` (underbody), `AAQGliDf`, `aesglod2`,
+`ASIGlODf` (glass) and `afpintdf` (interior); the body texture is in both sets on
+all 23 bodies.
+
+**CORRECTION — this paragraph first said "0 files have a left-only body texture"
+and "the body texture is in both sets on every one of them", and both halves of
+that are wrong as written.** Measured corpus-wide now: **2 files put their
+most-used texture on the LEFT flank only** (`esca5`, `escc5`) and **11 on the
+RIGHT only** (`205a5`, `205c5`, `cora5`, `ma1a5`, `ma1c5`, `ma2a5`, `ma2c5`,
+`ma3a5`, `ma3c5`, `mita5`, `mitc5`). They are not a counter-example, and the
+reason is measurable: all 13 are **`*a5` / `*c5` cockpit-interior files** (their
+parts are `20interior`, `27swheel`, `22wiperL`/`22wiperR`, `28gearhand`,
+`41Speedo`, `30dash`), so their most-used texture is a dash / door-card texture
+and the triangles my flank band catches in them are interior trim and glass, not
+artwork. Restricted to the files that carry a livery — the 23 `*a1N`, which is all
+the `BODIES` mode counts — it is **23/23 on both flanks, 0 one-sided**. So there
+is nothing for our binding to have got wrong: there is no second texture to bind.
+
+### What the data actually does, measured
+
+Mirrored triangle pairs (`(x,y,-z)`, matched vertex by vertex) over the 23 body
+meshes, comparing texture coordinates at the mirrored vertices:
+
+```
+flank triangle pairs with SAME u at the mirrored vertices : 2025   <-- the answer
+flank triangle pairs with u complemented (u' = 1-u)      :    1
+neither (different tessellation on the two flanks)       :  425
+```
+
+Per car, `seaa1N` is 90 / 1 / 13 and `205a1N` is 66 / 0 / 30 — and the pairs are exact, not approximate.
+Three vertices of one `seaa1N` (`08BodySim`) front-wing triangle and their
+mirror partners, copied out of `python3 tools/flank_mirror.py PAIRS seaa1N --xyz`
+(the matcher requires each vertex to have a partner within 2e-3 on x, y and −z):
+
+```
+P=(-0.829,-0.267,+0.896)  uv=(0.297,0.063)      P'=(-0.829,-0.267,-0.896)  uv=(0.297,0.937)
+P=(-0.368,-0.492,+0.835)  uv=(0.420,0.003)      P'=(-0.368,-0.492,-0.835)  uv=(0.420,0.997)
+P=(-0.424,-0.268,+0.830)  uv=(0.405,0.063)      P'=(-0.424,-0.268,-0.830)  uv=(0.405,0.937)
+```
+
+`x` and `y` are identical and `z` changes sign, exactly; `u` is identical to three
+decimals at every mirrored vertex (0.297/0.297, 0.420/0.420, 0.405/0.405); `v` is
+the complement (0.063/0.937, 0.003/0.997).
+
+**CORRECTION — the table that stood here had a mis-paired row.** Its second row
+was `P=( 0.176, 0.033, -0.835)` against `P=( 0.021, 0.035, +0.835)`: `x` does not
+match, so it is not a mirrored pair at all, and its `u` differs by 0.042 —
+i.e. it was a vertex from the `neither` bucket sitting in a table meant to show
+the same-`u` relation. Rows 1 and 3 of it were real, and had been rounded by hand
+to the vertex `z` rather than the triangle centroid; the rows above are verbatim
+tool output instead. **It never touched the counts** (2025 / 1 / 425), which come
+from the tool, not from the table.
+
+**The 1 complemented pair, named, because it was the last loose end.** The tool
+prints its example now, and it is a wrap seam, not a mirrored island: `u=0.004`
+against `u=0.997` on `seaa1N` `05BonCamDay`. Every one of the **4** such pairs in
+the whole corpus (`seaa1N`, `seac1`, `seac3`, `audc1` — one each) sits on those
+seams (`u=0.004` vs `0.997`, `u=0.000` vs `0.999`, `u=0.014` vs `0.989`: the same
+texel reached from the other end of 0..1). **4 pairs out of 12,484, all of them
+at the seam, 0 genuine `u' = 1-u` pairs.**
+Same `x` ⇒ **same `u`** (0.727/0.727, 0.405/0.405), and `v` is the complement
+(0.820/0.180, 0.809/0.191 — `v' = 1 - v` to three decimals). So the livery's
+"along the car" coordinate runs the same way round the car on both flanks, and
+the texture's two halves are vertical mirrors of each other (normalised
+  cross-correlation on that car's body texture, `seaa1N` `ASCDBoDf`, band
+  `u[0.40,0.76] v[0.79,0.88]` against `u[0.40,0.76] v[0.12,0.21]`: **0.845 for
+  `A` vs `flipud(B)`**, **-0.152 for `A` vs `fliplr(B)`**).
+
+**That correlation, re-measured through a tool in the re-verification pass,** so
+it is no longer a number with no script behind it:
+
+```
+TEXDUMP=/tmp/q2tex <build>/cmr2deck seaa1N --game ~/.lena_cmr2
+python3 tools/flank_art.py /tmp/q2tex        # <- new, stdlib only
+  NCC(A, B (no flip)       ) = +0.218
+  NCC(A, flipud(B)         ) = +0.816     <- the claim
+  NCC(A, fliplr(B)         ) = -0.176     <- and the other half of it
+  NCC(A, fliplr(flipud(B)) ) = -0.030
+```
+
+Same relation, coefficients a little different from the 0.845 / -0.152 first
+written down: a different viewer build's decode of the same `.bfl` block (the
+texture is 1024x1024, so a 93x369-pixel band pair), not a different finding.
+`flipud` strongly positive and `fliplr` negative in both passes is the whole
+claim, and the sign of `fliplr` is the load-bearing part.
+**What that buys:** the `v' = 1-v` mapping therefore lands both flanks on the
+same artwork, upright — and the only difference left is the horizontal sense.
+**Viewed from outside, one flank is the horizontally mirrored image of the other.** That is what the phone saw, and it is
+in the file.
+
+Two more measurements that close the escape routes:
+
+- **UV set 1 is UV set 0.** Every vertex of every part of `205a1N` (1,204
+  vertices), `foca1N` (1,144) and `6r4a1N` (1,360), 14 parts each: `uv1 == uv0`
+  exactly, 0 differing vertices. So there is no second UV set holding a "correct"
+  mapping that the game uses and the viewer does not. (The engine does select the
+  second set for texture stage 1 in blend case 9 — `SetTexCoordIndex(param1, 1)`
+  in `ApplyTextureStageChange`, `0x004a4850` — but the set it selects is a
+  byte-for-byte copy of set 0, so it cannot change a livery. Case 11's
+  `TCI_CAMERASPACEREFLECTIONVECTOR | 1` is an environment map.)
+  Provenance: this is the viewer's own `uv1 == uv0` check re-run over three cars
+  and every part, not the engine's call sites; the call sites are read from the
+  decomp.
+- **Our own render agrees with the file.** Flat-lit flank views
+  (`AMB=1 GAIN=0 FILL=0 SHADOW=0 BG=0 OFFW=2000 OFFH=1000 ELEV=0 DIST=0.35`,
+  `YAW=0` and `180`, car `seaa1N`), OCR'd with `tesseract` (`afr` is the only
+  traineddata on this Deck): a competition number reads as **`OS`** (conf 82) in
+  the frame as rendered and as **`20`** (conf 94) only after a horizontal flip of
+  the frame; the other flank's text needs no flip. And the decals themselves are
+  stored reading normally in the texture — `seaa1N` `maxon` @(512,834), `MoviStar`
+  @(739,226); `cora1N` `MoviStar` @(748,252) and @(769,870); `6r4a1N`
+  `COMPUTERVISION` @(244,248); `foca1N` `Movista` @(196,455) — so the art is not
+  pre-mirrored anywhere in the texture; the mirroring is the *mapping*, not the
+  picture.
+
+### The honest limit
+
+The step from "the file mirrors one flank" to "the game mirrors one flank" is the
+engine's draw path (above), and it is a reading of the decomp, not a picture. The
+one measurement that would replace the argument with a photograph is running the
+retail game itself on a car-viewer screen and looking at both sides — the install
+is on this Deck and there is a launcher, but the port cannot draw a car yet (the
+D3D7 state tracker is still the M5 gap, §5/§6) and I did not fire the original game
+up for this. If that run ever contradicts this
+block, the block is wrong, not the run. But the game has no per-side texture to
+bind and no UV transform to apply, so I do not expect it to.
+
+### Do not "fix" it
+
+There is no local fix. A global u flip in the viewer would make the mirrored flank
+read and break the flank that already reads. The mirroring is a property of the
+shipped art: the left flank's islands are UV'd the same way round as the right's.
+The correct action is to record it and stop looking at it.
+
+**Reproduce, from this repo:**
+
+```
+python3 tools/flank_mirror.py PAIR seaa1N 205a1N     # the pair relation, per car
+python3 tools/flank_mirror.py PAIRS seaa1N --xyz     # every matched pair, one line each
+python3 tools/flank_mirror.py BODIES                 # 23 *a1N bodies: 2025 / 1 / 425
+python3 tools/flank_mirror.py PAIR --all             # the pair relation, all 259 cars
+python3 tools/flank_mirror.py CORPUS                 # 259 .c3d: textures + u direction
+python3 tools/flank_art.py <TEXDUMP dir>              # the texture-side correlation
+```
+
+`tools/flank_mirror.py` (stdlib only, parses the container the same way
+`cmr2deck.c` does) prints exactly the numbers above. Two of these commands were
+added in the re-verification pass, and they are the ones that make the headline
+counts exact:
+
+- **`BODIES`** prints `body/livery texture used by BOTH flanks: 23 / 23`,
+  `mirrored-pair triangles: same u 2025  u complemented 1  neither 425`,
+  `du/dx L+: 1076 L-: 257 R+: 1055 R-: 309`, `cars whose two flanks run u the
+  same way: 23 (opposite: 0)`. The **2025 / 1 / 425 is the sum over the 23 `a1N`
+  files**, which is what the block means by "the 23 body meshes".
+- The earlier command list labelled `PAIR --all` as "all 23 body meshes". That was
+  wrong: `PAIR --all` is **all 259** cars, and sums to **10476 / 4 / 2004** —
+  interiors included. Anyone who followed the old list and added it up would have
+  got a number that contradicts this block. Corrected here.
+- `CORPUS`: `du/dx sign over outer flank triangles L+: 5843 L-: 887 R+: 5948
+  R-: 1114 / cars whose two flanks run u the same way: 181 (opposite: 11)` is the
+  same finding from the other direction. The 11 "opposite" files are **all
+  `*a5` / `*c5` cockpit interiors** — nine of them carry a single flank-band
+  triangle on one side against 18 on the other, the other two are `6r4a5` /
+  `6r4c5` (29/2 and 35/1) and `corc5` (1/12). (The block first described these as
+  "1–3 flank triangles each", which is true of the one-sided texture files, not of
+  these; the substantive claim — they are interiors, not bodies — was right.)
+
+
+## 0b. THE FRONT DOOR — REVIEWED, ONE NUMBER FIXED. appended 2026-10-10 18:45 EEST
+
+The phone rewrote `README.md` as a front door (commits `0e99687`, `dd05c98`, `412ab9e`:
+front door, glossary, and the original README archived verbatim) and invited this side to
+overwrite anything that misstates the work. Reviewed on the Deck against the tree, not
+against memory. What re-ran, and what changed:
+
+- **Re-ran — all reproduce.** `cmr2lab repack` against the install: **581/581
+  byte-identical, 7.8 s**. Compile sweep: **33/66 on x86_64** (33 FAIL, every first error
+  the pointer class, 1,504 error lines, **1,377 distinct `file:line` sites**) and **66/66 on
+  i386 with `-Wno-c++11-narrowing`**. D3D7 regex: **278 sites / 20 methods**, 225 of them in
+  `Graphics.cpp` (81%), **22 draws / 256 state**. `<windows.h>`: 45 files. `__asm`: 35
+  blocks in 6 files (a 36th mention is inside a comment), every block inside `#ifdef
+  _MSC_VER` with an `#else`. Install layout for the README's example path:
+  `Game/Cars/205a1.bfl` → `unpack` gives **27 textures**.
+- **One number was wrong: `2.26 GB`, now fixed.** It is not the install — it is the disc
+  copies in `gamedata/`. Install **638 MB**, the 582 `.bfl` **417 MB**. (§6, resolved.)
+- **"66 of 66 on i386" was only true with a flag the published harness did not pass.**
+  Without `-Wno-c++11-narrowing`, `tools/sweep-compile.sh` reports **64/66** — `Game.cpp`
+  and `GameInfo.cpp` fail on 32-bit `case` values above `INT_MAX`. The flag is now in the
+  script with the reason, and PORT-PLAN §3 carries the caveat. The x86_64 count is
+  unaffected (verified both ways).
+- **One sentence was sharpened, not corrected.** The plain-words section read "The renderer
+  is being rewritten. It draws a car ... onto your screen using a real Vulkan window",
+  which a reader can take as *the game* drawing it. It now says on the first screen that the
+  *data* is the game's and the *draw code* is this project's viewer, with `FRAME-NOTE.md` §2
+  as the reference. Also fixed: "Nothing you type here can break your Deck" — not true of a
+  terminal, only of the block below it.
+- **Not touched:** the archived body (verbatim by design), the phone's other commits, the
+  repo name, and the roadmap list itself — only item 4 gained a clause saying which part of
+  it already exists (`FrontendMenus.cpp`).
+
+## 0. THE FRAME MIAMI ASKED FOR — added 2026-10-10 15:15 EEST by the worker on
+## the "make the port a pretty thing to look at" job.
+
+**This block is APPENDED BY A DIFFERENT WORKER, at the top, on purpose.** The rest
+of this file is carried forward from the 14:54 rewrite and I did not re-verify it.
+Read §0 as mine, dated, and everything below as the previous worker's.
+
+- **It is on GitHub, which is how the phone gets it.** `screenshots/cmr2deck-205a1N-1280x800.png`
+  (one frame, 1280x800, 4x MSAA) and `screenshots/cmr2deck-205a1N-4views-1280x800.png`
+  (four yaws, 640x400 each, stacked). Commit `66d32d1`, pushed 15:12.
+- **`docs/FRAME-NOTE.md` is the honest note and it is the deliverable that matters.**
+  It says line by line what came from the game's own code and what is mine. The
+  one-line version: **the port does not draw this.** The *viewer* (`src/port/cmr2deck.c`)
+  draws the game's *data* with our draw code, outside the game.
+- **What changed, in one sentence:** the viewer now binds the texture each triangle
+  names in the file (`MeshTriangle + 4`, `field_0x2c = 0`, the rule in
+  `Game_DrawMeshTextureRuns` 0x0049c510) instead of matching part names against the
+  texture table — and it uses the game's own alpha test (`ALPHAREF` 0x80/1,
+  `D3DCMP_GREATER`) and blend pair (SRCALPHA/INVSRCALPHA). Before: every body panel
+  was bound to texture 0, `AP5NWBDf`, mean RGB 17,17,19, which is why the car was a
+  grey blob. After: 8 distinct textures over 27 runs, 0 runs refused.
+- **Measured, not eyeballed** (`src/port/tools/preview.py --diff`, against a frame
+  rendered with `NOCAR=1`): the car covers **28.8%** of a 1280x800 frame in 1089x509 px;
+  its mean luminance is **76.6**; the culling direction is settled by measurement
+  (`CULL=front` drops that to **28.8**, `CULL=back` ≈ `CULL=none`), so the faces kept
+  are the outside ones.
+- **Mine, labelled, and in the note:** the ambient value, both lights, the planar
+  ground shadow, the backdrop, MSAA, the camera and the framing.
+- **Biggest gap:** CORRECTION 2026-10-10 19:0x (§0c): the tracker **exists** and the
+  count is **276 of 298** (298 − 22 draws). Measured, the backend served 1,334,903
+  draws through **one** pipeline with 0 refusals. The port still cannot draw a car
+  for a different reason: **the game never issues a mesh draw** — 206 mesh vertex
+  buffers, 469,890 vertices, zero draws through them — and the states the lit mesh
+  path sets (COLORVERTEX, DIFFUSEMATERIALSOURCE, fog, NORMALIZENORMALS…) are among
+  the 10 render states the device answers `D3D_OK` and drops. This frame is the target image
+  for M3 and the run-split/alpha/texture list above is the spec it has to reproduce.
+- **The texture fix has a number, not an opinion.** `NAMETEX=1` renders the old
+  name-matched path, so the two were diffed: car mean chroma **2.2 → 13.6**, mean
+  luminance **23.1 → 72.7**, and 505 of 888 triangles moved off the wrong texture.
+- **The path runs on all 259 cars**, not on the one I looked at:
+  `docs/tables/texruns-sweep.tsv` + `src/port/tools/texruns_sweep.py` — 259/259
+  completed, **0 cars with anything wrong**, 123,127 triangles, 3,873 runs, median
+  15 runs per car, 0 runs refused. Slot roles are the same across four
+  manufacturers and the dimensions land at 3.7–4.2 m by 1.4–1.5 m.
+- **The textures in the frame are byte-exact against an independent decoder**:
+  `tools/tex_verify.py` (Python, from the specs) vs the C viewer's own decode over
+  the four cars in the pictures — `blocks compared: 108   mismatches: 0`.
+- **Colour is not swapped** (the check that makes a render trustworthy): the car's
+  mean colour in the frame matches that car's own body texture in channel order on
+  all three cars tested, including the blue Impreza and the blue Metro 6R4.
+- **The windowed path core-dumped and now does not** (`patch_swapfmt.py`: a Deck
+  swapchain is `B8G8R8A8_UNORM`, not `R8G8B8A8_UNORM`, and SDL refuses a resolve
+  across two formats). Verified: 120 frames in a real window, clean exit.
+- **The frame is reproducible from the repo byte for byte**: replaying the five patch
+  scripts over the pristine source, rebuilding and re-rendering gives the same md5
+  (`91a8ad5135bf1171568b950f95d22598`) and 0 differing pixels.
+- **Not claimed:** no human has looked at this frame. Miami is the first. And 258 of
+  the 259 cars in the sweep have never been looked at at all — that sweep is counts.
+
+---
+
+## 0.5. t2 CLOSED, and the two source steps of §5 done — appended 2026-10-10 18:25 EEST
+
+*Appended by the worker on job `t2-unblock-close` (from phone-Lena). This block is
+mine and dated; §0 and everything below it is the previous workers', untouched
+except where a correction is marked CORRECTED.*
+
+**`t2` is closed.** `state/task_queue.json`, id `t2`: `blocked` → `done`, finished
+2026-10-10T18:12:27, written under the daemon's own flock with a backup at
+`state/task_queue.json.bak-pre-t2close-20261010-181227`. There is no `blocked` entry
+left in the queue. The evidence is fresh, not quoted from a doc: from inside the
+daemon's own process `DISPLAY=:0 WAYLAND_DISPLAY=wayland-0 SDL_VIDEODRIVER=unset
+SDL_ASSERT=abort`, and the 2026-10-09 presenter re-run under it printed
+`[ OK ] window+device+claim on driver=vulkan` … `PRESENTED 60 frames to a real
+swapchain`, exit 0, no dialog, nothing left on his screen.
+
+**P3 — the one line, and it was worth more than one line.** `LONG`/`ULONG` in
+`platform/platform_types.h` were 8 bytes; they are now `int32_t`/`uint32_t`.
+Measured against the i386 row as the reference: `POINT` 16→8, `RECT` 32→16, `SIZE`
+16→8, `MSG` 48→40 (`hwnd` is a real 8-byte pointer, so 40 is right), and
+`(LONG)(INT32_MAX+1)` wraps again. It unlocks **no** files by itself — 27/39 before
+and after, same file list — and **it is an ABI change: 14 mangled symbols move**
+(`Input.cpp` 12, `rhi/deck_dd7.o` 2), so every prebuilt object in the tree is
+invalidated by it. That is the reason to do it now, while the tree is still small.
+
+**P1.** The 7 pointer-bearing size asserts are re-expressed as
+`sizeof(X) == (sizeof(void*) == 8 ? 0xNN : 0xNN)` — both oracles kept, nothing
+deleted, the other 10 asserts untouched and re-verified as still passing. The
+64-bit numbers come from clang's own record-layout dump, not from arithmetic.
+**Sweep: 27 → 33 PASS, 39 → 33 FAIL, zero regressions**, and **every remaining
+failure in the tree is now one class**: `cast from pointer to smaller type 'int'`
+— 1,377 distinct sites across 33 files, led by `FrontendMenus.cpp` 305,
+`FrontendScreens.cpp` 236, `GameInfo.cpp` 176, `StageObjects.cpp` 135.
+
+**Verified against the port that actually runs, which is i386.** All 66 game
+objects rebuilt against the new headers, `deck_dd7.o` rebuilt, platform 5/5, link
+exit 0, and a 20-second windowed run compared with the pre-change binary:
+**normalised logs byte-identical — 59 lines, empty diff.** The three message boxes
+in that run ("Setting configuration to defaults", 2× "Make sure the CMR2 CD is in
+the CD drive") appear in **both** binaries: pre-existing, GAME2-res's lane, not
+caused here and not papered over.
+
+Method, numbers, and the things deliberately left alone (`HRESULT`/`LPARAM` width;
+P2 untouched): `work/P3/P3-P1-REPORT.md`. §5 items 2 and 3 are therefore done. What
+is left is §5 item 1 (the pad lane) and **P2 — the only thing now between this tree
+and 66/66.**
+
+**ASK (sequencing, not a blocker).** P2 is 1,377 mechanical sites; S2 (the D3D7
+state tracker) is the thing that stops the port drawing its own 3D. My plan says P2
+then S2. If you want them swapped so the game looks right sooner, say so here and I
+will swap — but I will not silently re-sequence my own plan.
+
+## 1. RIGHT NOW
+
+- **Daemon** `lena_daemon.py` pid **250660**, **2 workers**, model `deepseek-v4-flash`,
+  uptime **5,400 s (~90 min)**, 400 steps per round. `state/status.json` was
+  refreshed 14:37:39 — **6 s old** at the moment the relay published, so the loop is
+  alive, not merely `active` under systemd.
+- **Worker 1 = GAME2-res** ("Can't boot up to the native resolution on a steam
+  deck"), claimed 14:29:08, **step 71** at 14:37:29. Working in `work/GAME2/r7`: it
+  wrote a `mkconfig.py` to put a real `Configuration/GameInfo.rcf` where the game
+  looks for it, rebuilt `outres/cmr2`, and is capturing frames
+  (`R7_SNAPFRAMES=1200,1500:/tmp/final.ppm`).
+- **Worker 2 = RELAY-VISIBILITY** (this page), claimed 14:34:47.
+- **Queue:** 33 tasks — 18 `done`, 11 `partial`, **2 `running`**, 1 `pending`
+  (`GAME2-r6-r3`, the auto-spawned continuation of the pad job), 1 `blocked` (§4).
+  `state/task_queue.json`.
+- **Relay:** last successful publish **14:37:25**, `first_fail: null`
+  (`state/relay_health.json`). The outbox is **1,537 bytes** and now carries the
+  work itself, not just the depth — §2.8.
+- Load average **2.08** on 8 threads. Nothing is starved.
+
+s — 17 `done`, 10 `partial`, **2 `running`** (those two),
+  2 `pending`, 1 `blocked` (stale — §4). `state/task_queue.json`.
+- **Relay:** systemd timer, 3-minute interval; last successful publish
+  **14:25:19** (`state/relay_health.json`, `first_fail: null`).
+- Load average 0.96 on 8 threads. Nothing is starved.
+
+---
+
+## 2. DONE — finished and verified
+
+**1. Every `.bfl` container round-trips byte-identical.**
+I re-ran this myself today at 14:17, from the *published* repo code, against the
+retail install:
+
+```
+repack VERIFY: 581/581 byte-identical   (skipped 1 non-container)
+exit 0 · 8.5 s wall (real 0m8.533s)
+```
+
+Raw output `/tmp/repack_verify.out`. The install holds 582 `.bfl` = 581 containers
++ 1 non-container, so the arithmetic closes. A modified container is therefore
+structurally indistinguishable from something the game shipped.
+
+**2. The geometry format closes exactly on every car.**
+Re-ran today 14:18 through the reader in `tools/c3d.py`:
+**259 / 259** car `.c3d` close on
+`48 + Σ(count×stride) + TEXCOUNT×24 + TEXCOUNT×260 == filesize`,
+**3,803** texture references, **zero** mismatches.
+
+**3. The decompiled game compiles further than this repo says.**
+My run, 14:19–14:20, published harness `tools/sweep-compile.sh`, one translation
+unit at a time, real `.o` files, `-ferror-limit=0`:
+
+| target | PASS | FAIL |
+|---|---|---|
+| `x86_64-linux-gnu` (the mandate) | **27 / 66** | 39 |
+| `x86-linux-gnu` (i386 — kept as an oracle) | **64 / 66** | 2 |
+
+Of the 39 x86_64 failures, **37 pass on i386** → blocked by pointer width and
+nothing else. 2 fail on both (`Game.cpp`, `GameInfo.cpp`) and both are only
+`-Wc++11-narrowing` on HRESULT literals; the local round-5 sweep passes
+`-Wno-c++11-narrowing` and with that flag i386 is **66 / 66**. **Zero** files pass
+on x86_64 and fail on i386, so the oracle still holds.
+
+Error census (x86_64, *all* errors, all files): **1,561** —
+1,504 `cast from pointer to smaller type` (1,449 of them to `int`),
+56 size asserts over **7 distinct structs** (InputFeedbackStateSize 17,
+InputDeviceStateSize 17, StageNodeTablesSize 14, PartStateSize 4,
+StageArchiveSizeCheck 2, StageObjectDraw_size 1, CollisionBoxSize 1),
+1 narrowing. **Zero undeclared identifiers, zero unknown types, zero incomplete
+COM** — those three classes (365 errors when this was last published) are closed.
+
+Evidence: `/tmp/sweep-verify-64/{results.txt,all_errors.txt}`,
+`/tmp/sweep-verify-32/results.txt`.
+**This repo is one measurement behind: README and `docs/PORT.md` still say 26/66
+and 53/66.** Fixed in §5 step 2.
+
+**4. The ported game boots, and its frontend answers the pad.**
+Not "it compiles" — pixel-measured on a screen that does not move by itself
+(noise floor **77 px**, bar **400 px**, counted *outside* a no-input mask):
+
+| input | px outside mask |
+|---|---|
+| stick up/down, D-pad up/down, L2, R2 | 2,922 – 4,006 |
+| A / START (Enter) | **7,118** |
+| B / SELECT (Escape) | **7,118** |
+| X, Y, L1, R1 | 0 (nothing, every screen tested) |
+
+Six consecutive UP/DOWN presses, all above the bar, values moving:
+2,922 / 3,055 / 4,006 / 4,012 / 2,985 / 2,922 — that is a selection walking a list.
+Source: `work/DECKPAD/verify5-results.json` (each row carries pre/post sha1,
+changed px, outside-mask px, bbox).
+
+**And the test in the brief had to be retracted.** A raw before/after hash is *not*
+valid on this build. I recomputed the no-input churn myself from the 134 raw
+captures in `/tmp/recon`: with nobody touching anything and no input injected,
+consecutive captures differ by **0 px on the still screens** and by
+**30,388 – 32,880 px** while the attract loop animates. The "29,368 pixels for one
+Down press" claim sits inside that distribution. It is not evidence; do not cite it.
+
+**5. Analog input reaches the game in the game's own units.**
+`lY = -59965` at full stick, `lZ(L2) = 56492` at 220/255; full scale `0x10000` is the
+game's own `DIPROP_RANGE`, not a guess — injected 91.5% came out 91.5%. Values are
+in `verify5-results.json` rows (`axis_values`).
+*Provenance: measured by the pad lane; I read the JSON with my own eyes but did not
+re-run the trace.*
+
+**6. The engine reads joystick AXES as magnitudes (source).**
+`Input.cpp:1577 CInput::ReadJoystick` writes raw magnitudes into
+`bindings[0..7].field_0xc`; `StageObjects.cpp:12648` writes the car's
+steer / throttle / brake as 0..0x3f scaled by |axis|. Throttle and brake
+**default to the same axis** (axis 1) — the combined-pedal convention.
+*Provenance: read out of the decomp and cross-checked against §2.5; the live-process
+confirmation is the run in flig**8. The relay works end to end, and the outbox now carries the WORK, not the depth.**
+I re-ran both suites after today's change, on this Deck, just now:
+`state/relay_tests.sh` → **20 passed, 0 failed** (injection, locking, corrupt queue);
+`state/relay_brief_tests.sh` → **22 passed, 0 failed** in the briefing section plus
+**4 passed** in a new corrupt-queue section (all sandboxed to `/tmp` — they never
+touch the live queue; a harness of mine leaked into the real queue once at 14:10 and
+that is why the sandbox is asserted).
+
+Live file, published 14:37:25, **1,537 bytes**:
+
+| key | what it is now |
+|---|---|
+| `current` | id + first line (≤90 chars) + `running_for` + worker id, ≤3 entri**A. Deck controls (GAME2-r6 pad lane).** Round 2 (`GAME2-r6-r2`) ended
+**partial** at 14:34:47 (67 steps, 1,328 s) and spawned **`GAME2-r6-r3`**, which is
+`pending` as I write. Its live checkpoint is `work/GAME2-r6/CHECKPOINT.md`.
+- **Round 2's headline result, in its own words:** it measured that the port already
+  drives the *real* pad — `/dev/input/event10 'Microsoft X-Box 360 pad 0'`, live
+  moving axis values — and read the game's own `DeviceInfo` out of `/proc/pid/mem`
+  under gdb holding the same values (`lX=2097, lY=-851, lRx=-1966, lRy=4587`). It
+  then found and fixed a **port** bug that had made analog impossible regardless of
+  mapping: `deck_dinput.cpp`'s `prop_id()` returned the object's address, so every
+  `RANGE` call returned `DIERR_UNSUPPORTED` and `controlCount` stayed 0. After the
+  fix: all 8 axes answer `DI_OK`, and the game itself calls `SetProperty(RANGE)`
+  ±0x10000 on each — inside an `if (controlCount > 0)`.
+- **What round 2 did NOT show:** it did not re-run the masked-pixel move proof on the
+  new binary ("show it MOVE with the actual pad" is *not* demonstrated by me on this
+  build), and it did not confirm the post-fix read-back in game memory
+  (`controlCount==8`, axis bindings 0/1/1). `m_controllerInfo` was still all zeros
+  300 polls in, i.e. `RefreshControllerConfigurations` had not run — **that is the
+  key unknown and it is what round 3 starts on.**
+- Pad → frontend, latest measured state: **6 of 22** tested inputs register above the
+  measured bar on the static screen; LEFT/RIGHT also register on other screens (both
+  axes work; which one bites depends on the screen). **4 of 22 are clean negatives
+  (X, Y, L1, R1) and are explained, not pending.**
+- Analog **delivered**: done. Analog **consumed by the car**: **0 of 1** — the
+  engine's throttle/brake axis (axis 1) is fed by nothing, because the port maps
+  L2→axis 2 and R2→axis 5. The fix is port-layer (`axis1 = R2 − L2`), not written yet.
+
+d shape
+told the phone end: `next[].via` reported `hand` for a continuation the daemon
+spawned itself; an empty `errors` said "nothing is wrong" while a job sat `blocked`
+for 17 hours; an unreadable queue published as zero pending; and `active` from
+systemd was the only health signal, which a wedged worker thread also produces.
+Verified on the live wire, not only in the sandbox — the file published at 14:37:25
+carries `via: "auto"` for `GAME2-r6-r3`, `blocked: [t2]`, `queue_readable: true`,
+`daemon_age_s: 6`. Every number in §1 came from reading that file back.
+
+n both the Python and the C probe.)
+
+**8. The relay works end to end.**
+Re-ran both suites today: `state/relay_tests.sh` → **20 passed, 0 failed**;
+`state/relay_brief_tests.sh` → **16 passed, 0 failed** (sandboxed to `/tmp` — they
+never touch the live queue). Live outbox published 14:25:19, **932 bytes**, carrying
+`current` / `next` / `last_done` / `errors`.
+
+**9. Nothing synthetic is left on his machine.**
+`/proc/bus/input/devices` has **no `uinput` entry** and no leftover injected pad —
+I checked at 14:18. The real nodes are there: Steam Deck Controller `event4`
+(keyboard) / `event9` (mouse), and Steam Input's virtual pad
+`Microsoft X-Box 360 pad 0` = `event10` / `js0`.
+
+---
+
+## 3. IN PROGRESS — with honest fractions
+
+**A. Deck controls (GAME2-r6-r2) — running, step 63 / 400.**
+- Pad → frontend: **6 of 22** tested inputs register above the measured bar on the
+  static screen; LEFT/RIGHT also register on other screens (both axes work; which
+  one bites depends on the screen). **4 of 22 are clean negatives (X, Y, L1, R1)
+  and are explained, not pending.**
+- Analog **delivered**: done. Analog **consumed by the car**: **0 of 1** — the
+  engine's throttle/brake axis (axis 1) is fed by nothing, because the port maps
+  L2→axis## 5. NEXT — the next three things, in order
+
+1. **`GAME2-r6-r3`** — first in the queue, auto-spawned, and the pad lane's own next
+   round. Its outstanding item is the one round 2 named: confirm the post-fix read-back
+   in the live game (`controlCount==8`, axis bindings 0/1/1) and find out whether
+   `RefreshControllerConfigurations` ever runs — if it never runs, the axis bindings
+   still do not exist even with the ranges fixed. Then re-run the masked-pixel move
+   proof on the new binary, and write the port-layer combined pedal axis
+   (`axis1 = R2 − L2`) driven by a real analog trigger value. That converts "analog is
+   delivered" into "analog is consumed".
+2. **`GAME2-res`** — native resolution on the Deck panel, 1280×800, filling it with no
+   letterboxing. Already running, worker 1 (§1).
+3. **Then the repo's stale numbers and the source bug** — 27 / 64 (66 / 66 with the
+   narrowing flag) replaces 26/66 and 53/66 in README and `docs/PORT.md`, with the
+   exact command printed beside it, and `typedef long LONG` gets fixed (one line) and
+   re-measured. And close `t2`, which is answered and still sitting in `blocked`.
+isk
+(§2.7). Nothing blocks it. **I did not edit the queue to close it** — status
+changes there are the daemon's to make, and that file has already been corrupted
+once by a test harness of mine.
+
+**Genuinely blocked, with what specifically blocks each:**
+
+- **37 files are blocked by pointer width alone** — mechanical `(int)` →
+  `(intptr_t)`, ~1,449 sites, no thinking required. Plus 7 size asserts (56 sites),
+  and one real bug: `platform/platform_types.h:29 typedef long LONG` is **8 bytes
+  on LP64, and Win32 `LONG` is 4 bytes always**. It compiles fine and silently
+  corrupts every struct holding a POINT / RECT / SIZE. Fix that line before
+  trusting any layout.
+- **ASAN does not build.** So **every number in this file about the port is
+  compile-level**. I have no runtime evidence about the port's correctness and I
+  will not imply otherwise.
+- **I cannot press the physical thumb.** Pad input is injected through a
+  `/dev/uinput` stand-in shaped like the real node (`event11` in that session);
+  while Steam Input owns the pad, only Steam can write the real node. So "the pad
+  works" means *everything downstream of the thumb is the game's own* — it does not
+  mean a human thumb was used.
+- **X / Y / L1 / R1 cannot work in the frontend, by the game's own design.** They
+  map to DIK_SPACE / C / LBRACKET / RBRACKET, and `ReadKeyboardDevice`
+  (`Input.cpp:1516`) translates exactly six keys into the 6-bit menu field. The pad
+  sends them, the input layer accepts them, the frontend has no bit to put them in.
+  Not a bug to patch — remapping them would change their gameplay meaning.
+  **Decision for Miami, not for me.**
+- **No human has looked at the game's window.** An external X11 grab of the root
+  window is byte-identical with and without the game running (40 lit px,
+  md5 `1cd11330e3` both ways), so every image here comes from the game's own
+  readback path. *Provenance: the pad lane's measurement — I did not re-run it.*
+- **The phone cannot drive this.** The relay has no shell: all it can do is append a
+  queue entry, which is exactly as powerful as a job Miami types himself, and no
+  more. One poll every 3 minutes, one direction per file, and the Deck never writes
+  to the inbox.
+
+---
+
+## 5. NEXT — the next three things, in order
+
+1. **Close the read that is running right now** (§1): get the game's own
+   controller/axis table out of the live process, then write the port-layer combined
+   pedal axis (`axis1 = R2 − L2`) and drive it with a real analog trigger value
+   through the game's own default binding path. That converts "analog is delivered"
+   into "analog is consumed".
+2. **Fix the repo's numbers, then the source bug.** Re-publish the sweep table as
+   27 / 64 (and 66 / 66 with the narrowing flag), plus the new error census, with
+   the exact command printed beside it; fix `typedef long LONG` (one line) and
+   re-measure. Delete 26/66 and 53/66 so nobody quotes them again.
+3. **Then the queue's pending jobs in queue order** — RELAY-VISIBILITY step 2 is
+   already built and tested (the outbox carries `current`/`next`/`last_done`/`errors`,
+   §2.8), so it needs verification against the live queue rather than new code; then
+   GAME2-res (native resolution on the Deck). And close `t2` as answered.
+
+---
+
+## 6. STILL NOT TRUE — read this one
+
+- **The game is not ported.** What runs is the decompiled game booting to its
+  **frontend**, drawing through the new SDL3/Vulkan layer. No race has been
+  started, no car driven, no stage loaded. Nothing here is evidence about gameplay.
+- **"It renders" is measured through the game's own readback, not a window.** No
+  human has confirmed the picture. §4.
+- **No pad input has ever come from a human thumb.** §4.
+- **The brief's own headline measurement is invalid.** "29,368 changed pixels for one
+  Down press" lies inside the no-input churn; I re-derived 30,388–32,880 px of churn
+  with zero input from the raw captures myself (§2.4). Any future registration claim
+  needs the no-input mask or it is unfalsifiable.
+- **X / Y / L1 / R1 do not register in the frontend and cannot** (§4). If you read
+  "every Deck control → the port's input path" as finished, it is four controls
+  short, on purpose, pending a decision.
+- **Analog steering and analog throttle are NOT live.** Analog values reach the
+  game's joystick device and the engine has the code to read them as magnitudes, but
+  **no axis carries them into the car** — and throttle/brake have no feeding axis at
+  all right now.
+- **The port has no working full backend.** CORRECTION 2026-10-10 19:0x (§0c): the
+  call count is **276 of 298 state calls** (not 277 — there are 22 draw sites, not
+  21), and **the state tracker that would service them DOES exist**
+  (`rhi/deck_dd7.cpp` + the pipeline cache in `rhi/a7_vk32.c`): a 28 s run of the
+  game's own binary made 1,334,903 draws through one pipeline, 0 refused.
+  What draws today is the frontend's path, not the game's 3D pipeline — that half
+  is now measured rather than asserted: **0 of 205,714 draws carried the mesh FVF.**
+- **Every port number here is compile-level.** ASAN does not build. §4.
+- **`2.26 GB` in the README does not match this install.** I measured the retail
+  install myself: 908 files, **0.59 GB** by summed file size, 610 MB by `du`;
+  the 582 `.bfl` are 0.39 GB. The container count is right (581 + 1 skipped); the
+  size figure is not. Not resolved, so not claimed.
+  >> RESOLVED 2026-10-10 18:45. Re-measured: install **638,124,559 B / 611 MiB (907
+  files)**, the 582 `.bfl` **417,400,892 B**. The number's origin is now known: 702.8 MB
+  (`cmr2.iso`) + 759.6 MB (`cmr2.zip`) + 807.1 MB (`Codemasters.bin`) = **2.269 GB** — three
+  copies of the disc, not the game. `README.md` now publishes 417 MB / 638 MB, and
+  `docs/README-ARCHIVE.md` carries an erratum because the bad figure sits in its verbatim
+  body. Round-trip re-run the same minute: **581/581 byte-identical, 7.8 s.**
+- **This repo's published port numbers are stale** — 26/66, 53/66, and "27 files
+  blocked by pointer width" are one measurement behind; today's are 27 / 64
+  (66 with the flag) and 37 files. Docs get fixed in §5 step 2, not before.
+  >> CORRECTED 18:25 (2026-10-10): the LONG line is fixed and re-measured. The
+  current x86_64 numbers are **33 PASS / 33 FAIL of 66**, all 33 failures being the
+  pointer-cast class. See §0.5 and `work/P3/P3-P1-REPORT.md`.
+- **The queue's status field is not a status report.** It says `partial` for ten jobs
+  that are finished and `blocked` for one that is not. This file is the status
+  report; trust it over the queue.
+  >> CORRECTED 18:25 (2026-10-10): the **blocked** one is closed now; the
+  partial-for-finished-jobs half is still true and still the daemon's file.
+- **Three commits were sitting on this Deck unpushed** (the dependency-map work).
+  They went up at 14:30 with the previous rewrite of this file — so if you read the
+  repo before then, you did not see them.
+- **`blocked: [t2]` on the wire is the queue's stale entry, not a real blocker.**
+  The outbox is a faithful copy of a field that is wrong (§4). I did not fix the
+  queue field; the daemon owns that file.
+  >> CORRECTED 18:25 (2026-10-10): the queue field is fixed — **t2 is now done**.
+  See §0.5. The wire will show it on the next relay tick.
+- **The queue contains a duplicate id.** `GAME2-r5` appears **twice**, both `done`
+  (a hand-typed INPUT job, and a later "GO HAM ON THE GAME"). It is harmless today
+  because both halves are finished, but two consequences are real: `queue_total: 33`
+  is 33 *entries*, 32 distinct jobs; and the relay skips any incoming command whose
+  id already exists in the queue in **any** status, so a future command that happened
+  to reuse `GAME2-r5` would be dropped silently. I did not rename or delete either
+  entry — the daemon owns that file. Flagging it rather than fixing it.
+- **`daemon_age_s` tells you the status file is fresh, not that work is advancing.**
+  A worker stuck inside one long `gdb` run keeps `status.json` ticking. `running_for`
+  growing with `last_done` frozen is the pair to watch.
+
+
+## 0d. THE TUNING SEAM AND THE TWO CONTROLLER TIERS — added 2026-10-10 20:25 EEST by the `padtune` worker; appended, nothing above it touched
+
+**The job.** Phone-Lena relayed Miami's controller-feel message: two tiers, EZ and
+ADVANCED, both required, with his own constraint quoted in it — *"I don't want to make it too
+confusing."* The brief was explicit that this is **not** a settings menu: it is the question
+of whether the open input layer makes tuning possible or impossible, plus a status statement
+for three parked items. Lane: `work/PADTUNE/`, checkpoint beside it.
+
+### What was found, and it is the fact the design rests on
+
+**The car adds no shaping of its own.** `StageObjects.cpp:12707-12718` reads the steering
+axis and scales it linearly — `FixMulShift32(half, 0x3f0000)` — with no dead zone, no curve,
+no saturation and no threshold; the throttle/brake path below it (`12728-12746`) is the same
+shape. So every dead zone, curve and saturation the car will ever feel is applied on the way
+out of the input layer or it does not exist in the program. Read from the decompilation, with
+line numbers.
+
+### What was built
+
+`platform/deck_dinput.cpp`, one edit (md5 `51523520bc49f31d490eda8a7a0e52ad`; backup
+`deck_dinput.cpp.bak-pre-padtune`, md5 `8adf8f0000ca563e069bc9366bc5e006` — the exact file
+the INPUTGEN lane published, so there was no drift to reconcile). The seam was already two
+functions wide and is now named as one: `axis_scaled()` for every analogue value, and
+`deck_pedal_axis()` for the game's single combined pedal axis, which is literally
+`axis_scaled(L2) - axis_scaled(R2)` — so per-trigger shaping reaches the pedal by construction.
+`PadTune` + `pad_tune_ez()` + `pad_tune_for()` + the knob table + an integer response curve
+(no `pow()`, no float: a float whose result depended on FPU flags would let two builds of the
+same source disagree about the car's steering). Both builds compile, link exit 0.
+
+### What was measured — EZ changes nothing, and a tuning screen cannot reach it
+
+Synthetic Xbox 360 pad driving the real game binary, read back through the port's own trace at
+a new `DECK_DIN_TRACE=4` (any change, not only changes over 0.4 % — without it a dead zone edge
+cannot be resolved at all). The readback waits for the trace to go quiet; a fixed sleep read a
+value one injection stale and that was caught and removed rather than reported.
+
+| | |
+|---|---|
+| **EZ vs a reference build of the pre-seam source**, 18-point steering sweep | **identical, 18 of 18** |
+| **EZ with every advanced knob set to something wild** | **identical, 18 of 18** — in EZ the code returns before it reads a knob |
+| steering dead zone 30 % | zero to 2000, knee between 8000 and 9000 (30 % of travel is 9830 of 32767) |
+| steering saturation 50 % | full lock at 20000 = half travel, dead flat after |
+| left trigger dead zone 30 % | zero to 76, then 77 → 65 (30 % of 255 = 76.5) |
+| the **right** trigger's dead zone knob, sweeping the **left** trigger | byte-identical to the untuned sweep |
+
+The last pair is the per-trigger claim. **The canonical binary was deliberately NOT relinked**
+— unlike last round, this change is opt-in by construction and EZ is bit-identical, so nothing
+is broken by its absence and relinking would invalidate the binary S2 measured its census
+against. The one line that does it is in the checkpoint.
+
+### The three parked items — stated, NOT started
+
+Same message. **No part of any of them was begun.** Two of the three (crowds, trees) were
+already written into `docs/WHERE-THIS-IS-GOING.md` by the 19:57 doc commits — the brief's
+trailer was true and *my local clone was behind*; I had re-derived that work before finding
+out and it was thrown away rather than merged. The third was missing and is now in: the
+overarching **"one GUI where you can choose the little bits and pieces"**, which is the port,
+the modkit, the toggles and the installer converging into one product — and which confirms the
+GUI installer is the **shape** of the project, not a wrapper on top of it.
+
+1. **Crowds and spectators.** The art is a data job (container cracked, repack verified
+   byte-identical). The *behaviour* he describes — running across the field, aware of the
+   track, taking pictures, waving — is a real new subsystem: per-spectator state and a
+   decision each. True 3D geometry replaces the billboard path. An **LOD question**, not a
+   "make it all 3D" question.
+2. **3D trees.** Same LOD answer: geometry near, impostors far. The billboards were a 2000
+   budget decision, not a mistake.
+3. **The overarching one** — *"from one GUI where you can choose the little bits and pieces."*
+   That is the port, the modkit, the toggles and the installer converging into one product,
+   and it confirms **the GUI installer is the shape of the project, not a wrapper on top of
+   it.** It also raises the stakes on the two-tier split: if depth is compulsory that GUI is a
+   wall of numbers, and if the default is correct the same GUI serves both people.
+
+### And one thing that needs a decision, because a document people trust is now wrong
+
+**`docs/CONTROLS.md` lost its decomp-sourced answers in commit `4fb2e27`** (2026-10-10 19:57,
+"controller feel — EZ tier and advanced tier"): 200 lines out, 46 in. Gone with them are the
+gear-up/gear-down answer read out of the string table and `Input.cpp:696`, the "there is no
+clutch, neutral is a gear value" finding, the automatic-gearbox rule, and the combined-pedal
+section. `git grep 'g_carButtonMasks' origin/main` now returns **nothing**.
+
+The problem is not the trim, it is the contradiction it left behind: the rewritten page says
+which button shifts up "has not been read yet", when it **had** been read, in that same file,
+one commit earlier (`5651627`).
+
+I did **not** revert her restructure — the page is its author's call and the restructure was
+deliberate. I added a short marked block under *What is still undecided* carrying the three
+answers and the citation, and pointing at `git show 5651627:docs/CONTROLS.md` for the full
+section. **If the citations are wanted back inline it is one revert of one section.** Say the
+word and it is done; flagging beats overruling.
+
+### Not true, and it belongs here rather than in §2
+
+- **No thumb has pressed the Deck's physical stick** — unchanged from §0c's neighbour, still
+  the same limit.
+- **No stage has been driven.** The curves are measured against the input layer, not against a
+  car. This is why **EZ contains the game's own numbers**: there is no stage to measure a
+  better dead zone on, and inventing one would be taste dressed up as engineering.
+  `pad_tune_ez()` is the single place that changes when there is something to change it with.
+- **No GUI was designed, and it was explicitly not the task.** What exists is the place a
+  GUI's numbers would land.
+- **Vibration is unimplemented and is NOT this seam.** It is the `IDirectInputEffect` path
+  (`Input.cpp:1795`, `1953`, `GUID_ConstantForce`); the device answers `CreateEffect()` with
+  `DIERR_UNSUPPORTED` on purpose.
+- **The trigger path has three thresholds, not one** — the game's 2 % dead zone, a 4 % pedal
+  gate and a 25 % key-mirror threshold. Collapsing them would change EZ, so they were made
+  visible and nameable instead. Written up in `docs/CONTROLS.md`.
+
+## 0e. THE MENU CAR IS NOT THE INDEX BASE — the hypothesis is dead, and it is dead by arithmetic. appended 2026-10-11 08:1x EEST by the `MENU-CAR-FLATTENED` worker; nothing above this block was touched
+
+Miami's report was a car in the **pre-race setup menu** that "flattens into one place …
+all mangled and jungled up into one flat piece of paper", and the phone's hypothesis was
+that this screen goes through `DrawIndexedPrimitiveVB` with the **opposite** index
+convention from the race, i.e. that the corrected base (commit `36bec65d`) broke it.
+
+**It did not, and no call site wants the old base.** Measured, not argued:
+
+* `DECK_IDXTRACE=1` over a whole frontend→stage→race run: **40,000 indexed draws with a
+  non-zero base, `rawInRange = 100.00 %` (1,358,988/1,358,988 indices), `usedInRange = 0`,
+  `relOk = 40,000`, `absOk = 0`, `neither = 0`.** The first indexed draws of the run —
+  the first 3D the game draws after a 100 %-2D frontend — are already relative:
+  `startVert=840 numVerts=116 raw[0..115]`, `startVert=1009 numVerts=60 raw[0..59]`.
+* Both index sources in the game are relative to `startVert` by construction:
+  `Mesh_BuildParts` rebases `pData` by `minIndex` and the draw passes
+  `vertexOffset + minIndex` (`Graphics.cpp:7476`); the runs/batches paths pass the
+  mesh-local `vertexIndex` with `vertexOffset` (`Graphics.cpp:7540`, `Game.cpp:2190`).
+  The subtraction was a second re-base in **both**. `Mesh.h:19` says it in the game's own
+  words: *"first vertex used (indices are relative to it)"*.
+* A/B, one variable, same binary, same frame numbers (`A7VK_IDXBASE` unset vs `sub`):
+  the 2D/menu frames move **1.6 %** of their pixels (mean 0.2/255, one box — animation);
+  the stage frames move **90–99 %** (mean 31–49/255). `frames/race2600_idxbase-RAW.png`
+  (920 kB) vs `…-SUB.png` (54 kB) is one frame number, one binary, one env var apart.
+
+**So the corrected base stays the default and nothing in the menu path needs the old
+one.** The order's "do not revert the whole fix" is satisfied by measurement: there is
+nothing to scope, because the corrected path only changes draws that are *impossible* as
+written and none exist.
+
+**What I could not do, said plainly:** photograph the menu car on the current build. On
+this build the attract route goes frontend → stage load → race without stopping at that
+screen, and pressing Esc during the race did not reach it either; the runs that DO show it
+(`owner1`…`owner6`, camera `eye=(0.14 -0.09 -5.00)`, 450/2560 cells, 8 textures, ~2,770
+tris/frame) ran at ~25-31 fps where mine ran at ~56, and reproducing their env did not
+reproduce the stop either, so what makes the route pause there is NOT established (an
+earlier draft of this block blamed a second driver's key injection; `run_owner2.sh` counts
+the scancodes those games saw and it is 2 -- one Enter -- so that attribution was wrong and
+is struck here). The
+screen's own numbers are in `docs/MENU-CAR.md` §3: **0 of 2,560 cells nearer than the near
+plane** (the car sits 4.12–4.60 units away against `znear = 1.00`), so the race's
+near-plane blow-up is not this screen's story either. `frames/menu-prerace_before-idxfix_23h09.png`
+is what that screen looked like on the **pre-fix** binary — the eye-side half of the
+question is still open, and it is named as open.
+
+GPU ring timeouts 12 → 12 across nine runs; no window left on his desktop. **His binary:
+I did not touch it, and it is no longer what it was when this round started** —
+`work/PLAY/out-plain/cmr2` was `b960621bcc5657e135640e35aa70869f` at 07:23 and is
+`97a9eb3b08595858a563282596680401` at 08:20 because the other worker's `out-death` round
+relinked it. My A/B ran `out-owner/cmr2` (the current tree's instrumented build).
+
+---
+
+**2026-10-11 08:2x — the menu-car addendum: the arithmetic is airtight, and the round's own
+numbers did not come from that screen.** (`MENU-CAR-EVIDENCE-VISION`, worker 2; evidence in
+`docs/MENU-CAR-EVIDENCE.md`. No game run this round — the display-death ticket held the
+GPU, and the phone ranks that one first.) Three things, all measured from bytes already on
+disk:
+
+* **The instrument never saw the screen the complaint is about.** The option-menu camera
+  `eye=(0.14 -0.09 -5.00)` appears in `owner1`…`owner5` and in **none** of the runs that
+  carried `DECK_IDXTRACE` (`mk_raw`, `mk_sub`, `mq_*`, `mp_sub`, `mcafter_sub`,
+  `idxtrace_race`, `idxfix_race`). Those runs' whole camera set is the frontend
+  `(-0.00 -0.00 -20.00)` and the race cameras. The 24 per-draw detail lines sit in one
+  window at **frame ≈2400** (right after `Race_LoadStageGeometry` /
+  `InRaceMenu_AdvanceCascade`), and the seven draw signatures that repeat from there are a
+  car in a **race**, every frame to the end of the run.
+  So "the pre-race / in-race menu car does NOT use the opposite convention" is
+  **over-claimed**: what was measured is the leftover trace of a route that never entered
+  that screen. (The quoted "40,000 draws" also matches no log here — the nearest is
+  `idxtrace_race.log` at 404,000 — flagged as a transcription slip, not a change of result.)
+* **The conclusion still holds, from the source and not from a sample.** All ten
+  `DrawIndexedPrimitiveVB` calls in the game, in five functions, hand either mesh-local
+  0-based indices with `startVert = vertexOffset`, or part-local indices already re-based by
+  `minIndex` with `startVert = vertexOffset + minIndex`. The shipped default reads
+  `startVert + idx` in both; `sub` reads `idx`. There is no call site that could want the
+  old re-base — and the preview/setup car is not a separate path: it is a `Mesh` that
+  `OptionPreview_RebuildDeformedGeometry` deforms per frame and re-uploads through
+  `Mesh_Rebuild`, drawn by the same functions. What a wrong base *would* look like is
+  exactly what the phone described (a neighbouring run of the same car buffer: car colours,
+  car-sized place, shards) — which is why her colour observation does not discriminate, and
+  why the arithmetic has to.
+* **The A/B now has the control it lacked.** Two runs of the *same* convention differ by
+  **1.61–1.67 %** of pixels; raw-vs-sub differs by **1.55–1.66 %**, in the *same* box
+  `x[146..1084] y[186..551]`. So the "2D frames do not move" claim is confirmed rather than
+  asserted — that box is an animated element, and at frame 2450, where the 3D is real, the
+  same pair differs over **91 %** of the frame (mean 70/255). Her patch (~150 px, below
+  vertical centre) is not that box; it is not in any capture this project holds.
+
+**Text, answered from the draw path because she asked which:** fonts load on both screens
+(`hel_*`, `lcd_*`, `ocr_*` TGAs, `mk_raw.log` 84–87 / 444–450), and
+`Font_DrawText → Font_DrawChar → Sprite_Queue → Sprite_DrawLayer →
+DrawPrimitive(D3DFVF_TLVERTEX)` is implemented end to end and used 1.66–1.87 M times per
+run (`0x1c4 TL`). Glyph quads land on layers 1/2, the only layers `Sprite_Queue` has and
+`Game.cpp:2667/2772-2778` draws every frame. Missing labels are therefore **not** a missing
+path; whether they reach pixels needs the same capture the A/B needs.
+
+**Next GPU window, in order:** (1) `LENA-MENUDRAW` — one line per indexed 3D draw with its
+FVF, stride, `startVert`, first indices and the **screen-space bbox of the vertices it
+actually read**, so the draw that owns a compact patch names itself in numbers; (2)
+`run_menuhunt.sh` + `menu_hunt.py` (written, untested — no GPU) — the screen was reached
+five times by runs that had foreign keys injected and never by the attract route, so a slow
+key burst at the frontend, watched for the camera line, is the cheapest route to it.
+Kernel ledger offered to the death ticket: no page fault, no `ring gfx_*` timeout and no
+`MODE2 reset` since **07:31:56**; the two today are 07:25:40 (pid 498908) and 07:31:49
+(pid 501251).
+
+## 0f. THE OPTION SCREEN'S TEXT PATH WAS A `ud2`, AND ITS 3D SUBMITS DRAWS THAT RASTERISE NOTHING — appended 2026-10-11 09:1x EEST by the `MENU-CAR-EVIDENCE-VISION` worker (round 2); nothing above this block was touched
+
+Round 1 of this task appended §0e-adjacent material and `docs/MENU-CAR-EVIDENCE.md`. Round 2
+appends §10–§16 to **that same file** and hands the phone
+`docs/NOTE-to-phone-MENU-CAR-EVIDENCE-2.md`. Two findings, both measured:
+
+**1. The option/setup screen's text placement was fatal in every build until 08:53.**
+`OptionMenu_TransformHudPointToScreen` (CMR2 `0x00503b70`, `GameInfo.cpp:6068`) was declared
+`int` and never returned a value, so clang's `ud2` executed on **every** call. Both call
+sites (`RallyData.cpp:7210`, `:7237`) are inside the option menu's label loop and the
+coordinates they write go straight into `OptionMenu_DrawTransitionTextShortCoords(…,
+GetTextString(0xfe), …)`. The last two SIGILL coredumps are **08:40:03, both from
+`work/PLAY/out-plain/cmr2`** — his own play binary. The `int`→`void` fix landed 08:53
+(md5 `d26a09231a98ebb25b6da8b664275f87`). Her photos are timestamped 07:35, i.e. **78 minutes
+before the fix**, so her "no menu text" observation is not a moiré artefact of the photo —
+on that build the screen's text placement could not run without killing the game. It is
+still a *candidate*, not a proof: a local pre-fix capture of a menu screen
+(`out/owner1.02_t68.ppm`) does contain glyph strokes (1-px-wide vertical runs, 17 px tall).
+One run on the current build decides it.
+
+**2. On that same screen the 3D submits 9,628 draws and rasterises ZERO triangles.** From
+`out/owner1.log`'s owner map, camera `eye=(0.14 -0.09 -5.00)` throughout: frame 3200 =
+711/2560 cells / 6,757 draws / **489,067 tris**; frame 3600 = 711/2560 / 9,628 draws /
+**207,801 tris**; frames **4000, 4800, 5800… = 0/2560 cells / 9,628 draws / 0 tris**, `0 tris
+behind eye`. Three 1280×800 captures inside that window (frames 3996/4883/5798) are
+**93.455 % a single flat colour `(140,149,158)` — 956,980 px, to the pixel in all three —
+with no car in the frame at all.** Geometry submitted and rasterising nothing is what
+degenerate geometry looks like, and its near-degenerate form is jagged fragments compressed
+into a small area still wearing the mesh's own paint — which is her picture. That moves the
+lead to the per-frame deform path (`OptionPreview_RebuildDeformedGeometry`,
+`GameInfo.cpp:8147`; `CarDamage_ApplyCameraSpaceMeshDent`, `StageTiming.cpp:5340`;
+`Mesh_Rebuild`, `Mesh.cpp:103`). No bug is claimed in that code from a read — the instrument
+proves it, not a paragraph.
+
+**No GPU run in this round.** Miami held the box both rounds (verified foreign, not assumed:
+`sh gpu-guard.sh --list` → `FOREIGN cmr2 /home/deck/lena/work/PLAY/out-plain/cmr2`). New
+tools: `tools/shard_bbox.py`, `tools/shards.py`, `tools/region_map.py` — read a capture's
+content, per exact colour, without a GUI. `A7VK_IDXBASE` was verified present in the live
+binary after worker 1's 08:53 rebuild, so the phone's discriminating A/B still exists.
+
+**Correction appended to the block above (~09:2x, same worker).** §12 of
+`docs/MENU-CAR-EVIDENCE.md` pointed at the deform path (family B) for the zero-triangle
+measurement. A peer round landed at 09:03 with **candidate C** done in arithmetic — the
+preview's 32-byte 16.16 fixed vertices read at the 48-byte float stride, so every coordinate
+is a denormal and `-1.0` is NaN — and **C predicts the same measurement at least as well**.
+New §12a corrects it, and her own colour report is the discriminator: colour sits at offset
+`0x18` in both layouts, so C gives **right paint, destroyed positions**, which is her
+sentence. B survives; A and D are dead on that screen. The separating field (`fixed32` vs
+`fixed48`) is already in `tools/patch_menudraw.py`.
+
+## 0g. THE MENU CAR'S OWN DRAWS, MEASURED ON THE OPTION SCREEN AT LAST — the index base is not it, and the geometry does not move. appended 2026-10-11 09:3x EEST by the `MENU-CAR-FLATTENED` worker (round 3); nothing above this block was touched
+
+> The ticket's own hypothesis, answered on the screen it was written about. Round 1 argued it
+> from ten call sites, §0f (the peer's) from the census. This round put the instrument on the
+> option screen itself: **one run, 10,500 indexed 3D draws of the menu car, every one of them
+> `zeroBase=no idxInRange=yes`.**
+
+**How it was taken.** `work/MENU-CAR-FLATTENED/out-md2/cmr2`, md5 **`cfd9cb7980dff26a5e56649467845432`**
+(the game plus `LENA-MENUDRAW`, built from the current `port/rhi/deck_dd7.cpp` with the RHI's own
+`build32_dd7.sh` recipe; `port/rhi/deck_dd7.o` and `PLAY/out-plain/cmr2` were **not** touched).
+`LENA_MENUDRAW=1 LENA_MENUDRAW_MAX=1500 LENA_MENUDRAW_AT=/tmp/mdnow` — a new **file-triggered
+burst** (`work/MENU-CAR-FLATTENED/patch_mdburst.py`) that fires when a driver touches
+`/tmp/mdnow`, because the old sampling (first N draws of the run) cannot be aimed at a car that
+is a few hundred frames of a 6,000-frame run. Driver `md_drive.py` reached the option camera at
+**t=132.4 s**, then fired **7 bursts** and took 7 captures and touched nothing of the peer's.
+Log: `work/MENU-CAR-FLATTENED/out/md_raw.log` (7.0 MB, 42,007 `[MENUDRAW]` lines).
+Ring timeouts `gfx_0.0.0` before **12**, after **12**.
+
+**1. ABSOLUTE OR RELATIVE — measured, not inferred: relative, all of them.**
+
+| what | value |
+|---|---|
+| indexed 3D draws parsed | **10,500** — `fvf=0x2d2 stride=48` on every one |
+| `zeroBase` | **no × 10,500** — startVert≠0 on every one (7 distinct: 1532, 1648, 1657, 1669, 1685, 1701, 1713) |
+| `idxInRange` | **yes × 10,500** — every index the backend received is inside `[0,numVerts)` |
+| `OUT OF RANGE` lines | **0** |
+| indices as the backend received them | e.g. `idx[0..5]=2,1,0,1,2,3` — part-local, needing `+startVert` |
+
+The ticket's hypothesis needs the menu car to hand **absolute** indices. It does not: it hands
+part-local ones, so the corrected default (`startVert + idx`) reads the vertex the game built,
+and the old `sub` re-base would subtract `startVert` a second time on **every one of these 10,500
+draws**. The menu car uses the **same convention as the race path**, and it is the same
+convention 10,500 times over with zero exceptions. **Item 3 therefore needs no scoping — the
+fix is right for both paths, and this is now a measurement rather than a good argument.**
+
+**2. WHAT MOVED: nothing, between bursts.** Every part's object-space box is **identical in all 7
+bursts** (8-second spacing across a held screen) — 1 distinct box per part over the whole run.
+If the screen's per-frame deform (`OptionPreview_RebuildDeformedGeometry` → `Mesh_Rebuild`) were
+crushing the car, its box would walk or collapse across the bursts. It does not move at all, so
+**candidate B is dead as the explanation of this screen** and the fault is static.
+
+**3. The 7 parts, object space, as the draws read them** (`parts.py`):
+
+| startVert | verts | idx | box (float decode of the bytes the draw read) |
+|---|---|---|---|
+| 1532 | 116 | 156 | x[-80..80] y[42.18..100] z[-80..80] |
+| 1648 | 9 | 24 | **x[-100..100] y[0..0] z[-100..100]** — flat plate at y=0 |
+| 1657 | 4 | 6 | **x[-100..100] y[0..0] z[-100..100]** — flat quad at y=0 |
+| 1669 | 32 | 24 | x[-80..80] y[13.98..79.66] z[-80..80] |
+| 1685 | 16 | 24 | x[-80..80] y[13.98..79.66] z[-80..80] |
+| 1701 | 60 | 36 | x[-80..80] y[0..65.57] z[-80..80] |
+| 1713 | — | — | (same family; see the log) |
+
+`nonfinite=0` on every decode, so this is not a NaN collapse, and the 16.16 re-read of the same
+bytes (`fixed48`) is *not* car-shaped either — the bytes are what a 48-byte float record should
+be. Every part is centred at **x=0, z=0** with y centres in {0, 32.785, 46.82, 71.09}, and two
+of the seven are **exactly flat** (all vertices at y=0). Whether that is a car seen from an angle
+the boxes cannot describe, or a car that was never assembled, is the one thing these numbers do
+**not** settle — see §4.
+
+**4. THE HALF THAT IS STILL MISSING, SAID PLAINLY.** The instrument prints **object space**. It
+cannot tell "the vertices are a car and the transform is wrong" from "the vertices are not a
+car". That is exactly the split the ticket's families A/D vs B/C name, and it needs the
+**device-space** box of the same draws, which `A7VK_GEOTRACE` already computes
+(`a7_vk32.c:1926`, `gt_note_3d`: dmin/dmax in device space, `anyin`/`anyw`/`nvis`, plus the three
+matrices). A run with both instruments on the same screen is **in flight as this is written**
+(`work/MENU-CAR-FLATTENED/wait_sub2.out`) — with `A7VK_IDXBASE=sub` as well, which is the A/B's
+missing half: **the first two attempts at `sub` never reached the option screen** (30 keys, 0
+captures, 0 bursts, `out/md_sub.hunt`), so the A/B is *predicted per draw* by `zeroBase=no` and
+the index arithmetic, and **not yet photographed**. It is not claimed.
+
+**5. THE CAPTURES SHOW THE CAR ABSENT, AND THAT MATCHES §0f.** Seven 1280×800 captures of that
+screen (`work/MENU-CAR-FLATTENED/frames/md_raw.00N.ppm`): 31k–33k distinct colours, but sampled
+over 49,105 px only **0.75 % have a horizontal gradient > 60**, and those sit in the bottom HUD
+band (rows 600–799) and rows 0–199 — **rows 200–599 are edge-free**: a dithered sky/ground
+gradient with no object in it. The owner map on the same frames reads
+**`0/2560 cells owned (0.0 % of the frame) by 0 textures | 0 tris drawn`** *while the instrument
+is printing 7 mesh parts per frame*. Submitted, and covering nothing. One PNG is in `frames/`
+under a name that says what it is.
+
+**6. A CORRECTION TO §0f'S READING OF `owner1.log`, with the numbers.** In `owner1.log` the
+census method counter reads `DrawIndexedPrimitiveVB=9628` at the frame-3600 census and **still
+9628** at the 4800 and 5800 censuses, while the option camera stays up throughout. So the game
+made **zero** indexed 3D draws after ~3600 on that screen: the "9,628 draws put zero triangles"
+line describes a screen where nothing is submitted at all, not 9,628 draws that rasterise
+nothing. (The owner map's own draw column is that same cumulative counter — its "tris" column is
+the per-frame one.) My run is the opposite case and it is the informative one: there the car *is*
+submitted, 7 parts per frame, 10,500 draws, and the frame still has no car in it.
+
+## 0h. THE A/B, ON THE OPTION SCREEN AT LAST — the switch is not inert there, and the old re-base kills the car. appended 2026-10-11 09:5x EEST by the `MENU-CAR-FLATTENED` worker; nothing above was touched
+
+> §0g measured the shipped default on that screen. This is the other half: same binary, same
+> screen, same route, **one env var apart**, `A7VK_IDXBASE=sub` (the pre-fix re-base).
+
+**The A/B pair, both runs on the option camera `eye=(0.14 -0.09 -5.00)`:**
+
+| | shipped default (`out/md_raw.log`) | `A7VK_IDXBASE=sub` (`out/md_sub4.log`) |
+|---|---|---|
+| indexed 3D draws recorded | 10,500 | 22,500 |
+| `zeroBase` | no × 10,500 | no × 22,500 |
+| **`idxInRange`** | **yes × 10,500** | **NO × 22,500** |
+| indices as the backend received them | `2,1,0,1,2,3` | **`64650,64649,64648,64649,64650,64651`** |
+| option-camera coverage of the frame (owner map) | **599 / 591 / 450 cells = 23.4 / 23.1 / 17.6 %** (3 of 16 dumps) | **0/2560 cells in 21 dumps**, at most 28/2560 = **1.1 %** |
+| the captures | 31k distinct colours, dithered sky/ground, no car (`md_raw.00N.ppm`) | **100 % one colour in 14 of 15 captures** (`md_sub4.00N.ppm`) |
+
+**The arithmetic that explains the index column, on the measured draws.** `sub` hands the backend
+`idx[i] - startVert`; with part-local indices (2,1,0) and `startVert=888` the subtraction
+underflows a `uint16` to **64650** — computed for all 10,500 draws of the default run, **100 %
+of them** land outside `[0,numVerts)` and past the end of the 2000-vertex vertex buffer
+(`work/MENU-CAR-FLATTENED/ab_predict.txt`). The run above then did it for real.
+
+**What this settles, in the ticket's own terms:** the index-base switch is **not inert on this
+screen** — every one of the menu car's draws has `startVert != 0`, so the switch reaches all of
+them — and the old re-base is **catastrophically wrong for the menu car**, exactly as it was for
+the race path. The corrected default is right for both, so **no scoping is needed and the fix
+must not be reverted**. Second PNG pushed: `frames/opt-preview-camera_20261011-0948_IDXBASE-sub_FLAT.png`
+(md5 `d8238905f8365730731d52d228077cc6`) — the `sub` screen, one flat colour, for the phone to
+hold next to the default's.
+
+**What it does NOT settle, said plainly: neither half is a picture of a mangled car.** The
+default run's frame has no car *in* it; the `sub` run's frame is empty. The defect the ticket was
+written about — a car that renders as "one flat piece of paper" — is therefore **still
+unexplained**, and §0g's two findings are why: the geometry does not move between bursts, and
+the object-space boxes of the parts the draws read are not car-shaped to begin with. The next
+instrument is named in §0g item 4 and in `work/MENU-CAR-FLATTENED/CHECKPOINT.md` §15: the
+**6,258 mesh draws in the same log that are NOT indexed** (`DrawIndexedPrimitiveVB=45705` vs
+`0x2d2 MESH=51963`) and **`A7VK_GEOTRACE`'s device-space box** for the draw that has one.
+
+## 0i. THE OPTION-PREVIEW CAR'S OWN DRAWS, MEASURED — the index base is not what breaks it. appended 2026-10-11 10:3x EEST by the `MENU-CAR-FLATTENED` worker; nothing above was touched
+
+> §0g and §0h measured the option screen with the owner map and the A/B, but **no run had ever
+> printed the menu car's own per-draw numbers**: the burst armed ~5 s late every time, because my
+> round-3 driver re-read the whole 17 MB log on every 0.5 s poll. This round the driver reads the
+> log incrementally and the sampling runs from draw #1 — the option-preview car *is* the first
+> indexed 3D content of the run (`[GEO]`: zero 3D draws at every sample up to f=3360, 1,836 at
+> f=3480, car-shaped object box), so no window has to be hit to measure it.
+
+**1. The car's draws are part-local, in range, 48-byte float — on the shipped default.**
+`out/md_car_raw.log`, 3,012 instrumented `DrawIndexedPrimitiveVB` draws of the car page:
+
+| | value |
+|---|---|
+| stride | 48 on every draw; `fvf=0x2d2` |
+| `idxInRange` | **yes × 3,012, NO × 0** |
+| indices as the backend received them | `2,1,0,3,2,0` … largest index anywhere **44** |
+| `startVert` | 0 on 336 draws, ≠0 on **2,676** — so the switch reaches 89 % of the car's draws |
+| vertex decode | `float48 x[-0.3265..0.3265] y[-0.3265..0.3265] z[-0.1405..0.1405]` — part-sized. The `fixed48`/`fixed32` lines are the **same bits** ×65536 (`-0.3265` → `-16880`), i.e. the data is IEEE float at 48-byte stride and candidate C (16.16-fixed-read-as-float) is dead for the car |
+
+**The ticket's hypothesis is dead on the car itself, measured, not inferred.** `A7VK_IDXBASE=sub`
+would subtract `startVert` from every one of those 2,676 draws whose indices are already
+part-local — the same underflow that broke the race path and that §0h's `sub` run showed as
+`64650,64649,64648`. **No scoping is needed and the fix must not be reverted.**
+
+**2. The same screen, A/B, in the owner map — default keeps the car, `sub` loses it.** Default
+(§0g's `md_raw`, and this round's `md_car_raw`): **599/591/450/648/632/463/658 cells owned =
+17.6-25.7 % of the frame, 2,073 tris, 8 textures, view depth 4.15-5.55 with the camera at 5.00**,
+shape rows 11-28 cols 7-51 (wide and low — a car, side on). `sub` (§0h): **0/2560 cells in 21
+dumps, at most 28/2560 = 1.1 %**, 48 triangles.
+
+**3. One PNG, and it is the first capture taken inside the car's own draw window.**
+`frames/opt-preview-camera_20261011-1035_CAR-FRAME_f8517.png` (md5 `d71a7580459eb9887d834418b367aec5`),
+frame 8517, 1,377 car draws in flight at that frame. It measures **96.417 % one colour
+`(140,150,158)`, 232 distinct colours**, and the region the car's own cells occupy shows **no
+pixel that differs from the backdrop** — the 2D UI (13,462 TL draws) is what is visible.
+
+**What MOVED this round:** item 1 is answered on the car (relative, in range, float — measured);
+item 2's A/B is on the option camera with the car's own draw window identified; item 3 stands
+(no scoping); item 4's PNG exists and is pushed here.
+
+**What did NOT move, said plainly:** the flat car is still unexplained, and a single capture does
+not even establish that it is flat rather than absent — the car renders in the backdrop colour, or
+its fragments never reach the presented image, and this frame cannot tell those apart. Several
+captures inside one car window is the next run, not this one. The pre-fix capture of the same page
+(`owner1.02_t68.ppm`) differs from ours in one region (`x 896..1150 y 167..530`) that is only
+partly inside the car's cells, so it is flagged, not claimed. All of it — with the driver defect
+that caused the three lost measurements, and the tools — in
+`work/MENU-CAR-FLATTENED/CHECKPOINT.md` §21-§25.
+
+### 0i-bis. THE CONTROL THAT MAKES 0i's PNG mean something — appended 2026-10-11 10:4x EEST (same worker, same round)
+
+The car-page PNG in §0i is only evidence if a capture taken the same way can show 3D. It can, and
+inside the **same run**: `frames/opt-preview-camera_20261011-1035_SAME-RUN_next-page_STAGE.png`
+(md5 `aaf7ff5d7f641db95dce7b99d9d1d0c7`, frame 9051, **952 3D draws in flight at that frame**) is
+**21,103 distinct colours, 62.6 % of the frame non-background, a densely shaded scene**.
+
+| capture (same run, same binary, same snapshot path, both with MENUDRAW drawing at that frame) | distinct colours | dominant colour | non-background |
+|---|---|---|---|
+| frame 8517 — the **car page**, 1,377 car draws in flight | 232 | `(140,150,158)` 96.4 % | 3.58 % |
+| frame 9051 — the **next page**, 952 stage draws in flight | 21,103 | white 37.4 % | 62.6 % |
+
+Both pages put thousands of 2D `TL` draws over the 3D (15,767 vs 3,481), so "an opaque 2D backdrop
+drawn after the 3D" explains the car only if that backdrop is page-specific — it does not cover the
+stage. **What is eliminated:** the snapshot path, the index base, the vertex format/stride. **What
+is left:** the car's own fragments (renders in the backdrop colour, i.e. a flat fill) or its draw
+being rejected after submission (depth/z-order on that one page).
