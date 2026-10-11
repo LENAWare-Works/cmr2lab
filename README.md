@@ -3,10 +3,11 @@
 **Colin McRae Rally 2.0 — Linux Rally Edition.**
 Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compatibility layer.
 
-> **This is not a finished game and it is not playable yet.** Read the status table
-> below before you download anything — it will take you ten seconds and save you an
-> afternoon. Everything else in this file is written for two kinds of people, and
-> both are labelled.
+> **As of 11 October 2026 you can get into a rally car and drive it — for about two
+> minutes, with the lighting wrong, and then it dies.** That is a real change from
+> where this was a day earlier, and it is still a long way from a game you can sit
+> down and play. Read the status table below before you download anything; it will
+> take you ten seconds and save you an afternoon.
 
 ---
 
@@ -25,11 +26,17 @@ natively on a Steam Deck.**
 It also draws a picture, and that sentence has to be exact: `screenshots/` holds real
 frames of a real car built from the retail game files, rendered on a Deck through Vulkan —
 but the **data** is the game's and the **draw code** is this project's own viewer. The
-game's own 3D path has not drawn anything yet; what the actual game binary draws today is
-its frontend, in 2D. `docs/FRAME-NOTE.md` says line by line which is which.
+game's **own** 3D path now draws too. The game loads a stage off disk, builds its own car
+list and runs its own race loop — and on the morning of 11 October 2026 that was driven by
+a person on a Steam Deck, on the project's own renderer, with the analogue stick and the
+triggers working.
 
-So it does not yet draw a *track*, a *car you can drive*, or a *menu you can click on*.
-That is what's left.
+It just does not survive long, and it does not look right yet. Three things are wrong and
+all three are known, named and being worked on: the **lighting** is incorrect, the **car in
+the pre-race setup screen** renders collapsed, and the session is **killed by a GPU fault**
+after a couple of minutes — that last one is what ends your run. `docs/` has a document for
+each. The exact state of every one of them is in `progress.md`, which is rewritten whole
+rather than appended to, so it cannot contain a stale claim above a fresh one.
 
 Separately — and available **right now** — this repo also contains tools that open the
 game's data files: pull textures out of it, look at them, change them, put them back,
@@ -49,12 +56,17 @@ game shipped. That part works today.
 | **See a car from the game drawn natively** | ⚠️ Yes, but it's a *viewer*, not the game | `src/port/` |
 | **Half the game's code compiling for Linux** | ✅ 33 of 66 files | `docs/PORT-PLAN.md` |
 | **The other half compiling** | ❌ Not yet — pointer-width work | `docs/P3-P1-REPORT.md` |
-| **Driving a rally car** | ❌ **No.** Not yet | — |
-| **Menus, tracks, stages, championship** | ❌ No | — |
+| **Loading a real stage and driving** | ⚠️ **Yes, briefly** — stick and triggers work | `src/port/` |
+| **Staying alive for more than ~2 minutes** | ❌ No — killed by a GPU fault | open |
+| **Correct lighting on the car and track** | ❌ No, wrong | open |
+| **The car in the setup screen rendering properly** | ❌ No, it collapses | open |
+| **Menus, tracks, championship, a whole rally** | ❌ No | — |
 | **A one-click installer** | ❌ Not yet — that's the destination | — |
 
-If you came here to *play Colin McRae Rally 2.0 on Linux*, the honest answer today is:
-**use Proton, it works fine.** Come back here later. This page will say so when it's time.
+If you came here to *play Colin McRae Rally 2.0 on Linux*, the honest answer today is
+still: **use Proton, it works fine.** This project gets you into a real stage on the game's
+own code, and then kills you. Come back here later — but if you want to watch the wall move
+or help push it, you are early enough to matter.
 
 ---
 
