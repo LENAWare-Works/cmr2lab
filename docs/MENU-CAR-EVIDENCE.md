@@ -454,6 +454,41 @@ in one run (per-draw object-space bbox vs screen-space bbox: a car-sized object-
 with a few-hundred-px screen bbox is A; an object-space bbox that is itself a point or a
 plate is B).
 
+## 12a. CORRECTION TO §12 — candidate C predicts this measurement AT LEAST as well
+
+A peer round landed in this repo at **09:03** (`docs/MENU-CAR-ROUND2.md`, `tools/patch_menudraw.py`)
+while §12 was being written, and it does the arithmetic on **candidate C** — the preview's own
+converted vertices being **32-byte 16.16 fixed** (`Unk0x0082d220VertexFixed`, `GameInfo.cpp:1383`,
+built by `OptionPreview_AllocateConvertedWheelVertices`, `GameInfo.cpp:7727`) while the port's
+stride rule is `TLVERTEX ? 32 : 48` (`deck_dd7.cpp:1442`) and the mesh FVF `0x2d2` is 48. Read as
+IEEE float, a 16.16 fixed coordinate is a **denormal** (`1.0000 -> 9.18355e-41`,
+`-1.0000 -> nan`), so the vertices stop being a car and start being one point.
+
+**§12 said the zero-triangle measurement "is the deform path". That is too strong and I am
+correcting it.** Both survive the measurement:
+
+* **C** — positions collapse/mangle, so the triangles are degenerate → the rasteriser drops
+  them → zero triangles, exactly as measured. And because the colour field sits at **the same
+  byte offset (0x18)** in the fixed layout as in the float layout, the **vertex colours and UVs
+  are still read correctly** while the positions are destroyed.
+* **B** — the deform path moves vertices onto the camera plane without touching the colour or
+  UV stream, giving the same zero-triangle result.
+
+**Her observation is the discriminator, and it favours C.** She did not report a grey blob or
+a mangled rainbow: she reported **the car's own livery, correctly painted — white bodywork,
+black graphics, saturated orange/red diagonals, mid-grey — with the textures right, torn up.**
+A stride mismatch that leaves colour and UV at the same offsets produces *exactly* "right paint,
+destroyed positions". C also explains "compressed into one small area" better than B does
+(a collapse toward the origin is one area by construction). I am not going to swap one
+paragraph's overclaim for another: **§4's families A/B/C/D remain, the measurement in §12 kills
+A and D on this screen, and it leaves C and B standing with C now the better-supported.**
+
+The separating instrument already exists — the peer round wrote and linked it
+(`patch_menudraw.py`, `LENA-MENUDRAW`), and it prints the same vertex **decoded both ways**
+(48-byte float and 32-byte fixed) with the min/max per axis. One line of its output says which:
+a car-shaped fixed decode with a collapsed float decode **is** C. So the GPU run named in §15
+is now the only thing missing, and the tooling for it is on disk.
+
 ## 13. THE TIMELINE — where her photos sit, and why that matters
 
 | time (EEST) | event |

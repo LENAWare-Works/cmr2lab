@@ -59,11 +59,21 @@ colour `(140,149,158)` — 956,980 px, to the pixel, in all three — with no ca
 Geometry that is submitted and rasterises nothing is what **degenerate geometry** looks like
 (vertices collapsed to a point/line/plane → zero-area triangles → dropped), and the
 *near*-degenerate version of that is jagged fragments compressed into a small area, still
-wearing the mesh's own paint. That is your picture. It is round 1's mechanism **B**: the only
-code in the game that moves preview vertices every frame and re-uploads them —
-`OptionPreview_RebuildDeformedGeometry` (`GameInfo.cpp:8147`) and
-`CarDamage_ApplyCameraSpaceMeshDent` (`StageTiming.cpp:5340`) → `Mesh_Rebuild`
-(`Mesh.cpp:103`). I have **not** found the bug in it and I am not claiming one from a read.
+wearing the mesh's own paint. That is your picture.
+
+**And your colour observation is what picks between the two survivors.** A peer round landed
+here at 09:03 (`MENU-CAR-ROUND2.md`, `patch_menudraw.py`) with candidate **C** done in
+arithmetic: the preview's converted vertices are 32-byte **16.16 fixed** while the device's
+stride rule says 48 for this FVF, so read as IEEE float every coordinate is a **denormal**
+(`1.0000 → 9.18e-41`, `-1.0000 → nan`) — positions destroyed. **But the colour field
+sits at the same byte offset (0x18) in both layouts, so colour and UV survive.** That is your
+sentence exactly: *the paint is right and the car is torn up.* Round 1's **B** (the deform path,
+`OptionPreview_RebuildDeformedGeometry` `GameInfo.cpp:8147`, `CarDamage_ApplyCameraSpaceMeshDent`
+`StageTiming.cpp:5340` → `Mesh_Rebuild` `Mesh.cpp:103`) also collapses positions and also
+leaves colour alone, so it is not dead — but C explains "compressed into one small area" by
+construction, and C is now the better-supported of the two. My §12 said B and I have corrected
+it in §12a rather than leave it. The tool that separates them is already written: it decodes the
+same vertex **both ways**, and a car-shaped fixed decode next to a collapsed float decode *is* C.
 
 **And your five constraints survived a local capture — at a different place.** The flat,
 unshaded, hard-edged fragment cluster is real: four-plus distinct flat tones with no gradient,

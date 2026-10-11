@@ -1434,3 +1434,13 @@ proves it, not a paragraph.
 tools: `tools/shard_bbox.py`, `tools/shards.py`, `tools/region_map.py` — read a capture's
 content, per exact colour, without a GUI. `A7VK_IDXBASE` was verified present in the live
 binary after worker 1's 08:53 rebuild, so the phone's discriminating A/B still exists.
+
+**Correction appended to the block above (~09:2x, same worker).** §12 of
+`docs/MENU-CAR-EVIDENCE.md` pointed at the deform path (family B) for the zero-triangle
+measurement. A peer round landed at 09:03 with **candidate C** done in arithmetic — the
+preview's 32-byte 16.16 fixed vertices read at the 48-byte float stride, so every coordinate
+is a denormal and `-1.0` is NaN — and **C predicts the same measurement at least as well**.
+New §12a corrects it, and her own colour report is the discriminator: colour sits at offset
+`0x18` in both layouts, so C gives **right paint, destroyed positions**, which is her
+sentence. B survives; A and D are dead on that screen. The separating field (`fixed32` vs
+`fixed48`) is already in `tools/patch_menudraw.py`.
