@@ -79,10 +79,15 @@ does not exist in this round. Why:
   produce the option-menu camera either;
 * the runs that *do* show it — `owner1`…`owner6`, camera
   `eye=(0.14 -0.09 -5.00)`, `450/2560` cells, `8` textures, ~48 draws and ~2,770 tris
-  per frame — are runs in which a **second driver was injecting keys machine-wide
-  through `/dev/uinput`** (the pollution `run_owner2.sh` documents). The menu in those
-  runs was opened by an injected key, not by the route. That is where the only pictures
-  of it come from, and one of them is in this repo now:
+  per frame — ran at **~25–31 fps** (`drive.py` turns the DD7 call census on) while mine
+  ran at **~56 fps**; reproducing their env exactly (`run_mcab3.sh`, census on) still did
+  not stop my runs there, so **what makes the attract route stop at that screen is not
+  established**. **CORRECTION, stamped:** an earlier draft of this file said those runs
+  were polluted by a second driver's injected keys. That is **wrong** — `run_owner2.sh`
+  counts the scancodes the game itself saw and it is 2 (one Enter down+up), i.e. no
+  foreign key reached those games. Struck, not softened.
+  That is where the only dump of it comes from, and one picture of the *screen itself*
+  (from the pre-fix binary) is in this repo now:
   `frames/menu-prerace_before-idxfix_23h09.png` (`out/patched-with-snaps.04_idle.ppm`,
   the 23:09 run, i.e. **the pre-fix binary** `b46d80fee5489834b87f843fd15484e0`).
 
@@ -156,11 +161,14 @@ A tex=33 211 cells 8.2%  B tex=36 68 2.7%  C tex=34 44 1.7%  D tex=38 2 0.1%
 
 * Six runs this round (`mc2`, `mcafter`, `mcafter_sub`, `mcbefore`, `mk_raw`, `mk_sub`,
   `mq_raw`, `mq_sub`, `mp_sub`): **GPU ring timeouts 12 → 12**, every time.
-* **His binaries untouched:** `work/PLAY/out-plain/cmr2` =
-  `b960621bcc5657e135640e35aa70869f`; the pre-fix backup
-  `cmr2.bak-pre-idxbase-20261011` = `e43d7a1e4279fe2c05647c7c053d4fd3` (md5s re-checked
-  after every copy). Instrumented copies live in `work/RACE/mkr`, `mks`, `mcbefore`,
-  `mcafter` and are named so `pkill -x cmr2` does not match them.
+* **I did not touch his binary, and I am not claiming it is unchanged.** At 07:23,
+  when this round started, `work/PLAY/out-plain/cmr2` was
+  `b960621bcc5657e135640e35aa70869f` and the pre-fix backup
+  `cmr2.bak-pre-idxbase-20261011` was `e43d7a1e4279fe2c05647c7c053d4fd3`. **At 08:20 it is
+  `97a9eb3b08595858a563282596680401`** — the other worker's `out-death` round relinked it
+  while I was writing this up. My A/B ran `out-owner/cmr2` (the current tree's instrumented
+  build, copied to `work/RACE/mkr`/`mks`), not his shipped binary; copies are named so
+  `pkill -x cmr2` does not match them.
 * No window left on his desktop, no stray process, `/tmp/mc.ppm.*`, `/tmp/mk.ppm.*`,
   `/tmp/mq.ppm.*`, `/tmp/mp.ppm.*`, `/tmp/snapnow` cleared.
 * **The box has two workers.** `mc_drive.py` refuses to fight: it watches for a competing

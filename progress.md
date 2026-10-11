@@ -1290,12 +1290,19 @@ written and none exist.
 this build the attract route goes frontend → stage load → race without stopping at that
 screen, and pressing Esc during the race did not reach it either; the runs that DO show it
 (`owner1`…`owner6`, camera `eye=(0.14 -0.09 -5.00)`, 450/2560 cells, 8 textures, ~2,770
-tris/frame) were runs polluted by a second driver's machine-wide key injection. The
+tris/frame) ran at ~25-31 fps where mine ran at ~56, and reproducing their env did not
+reproduce the stop either, so what makes the route pause there is NOT established (an
+earlier draft of this block blamed a second driver's key injection; `run_owner2.sh` counts
+the scancodes those games saw and it is 2 -- one Enter -- so that attribution was wrong and
+is struck here). The
 screen's own numbers are in `docs/MENU-CAR.md` §3: **0 of 2,560 cells nearer than the near
 plane** (the car sits 4.12–4.60 units away against `znear = 1.00`), so the race's
 near-plane blow-up is not this screen's story either. `frames/menu-prerace_before-idxfix_23h09.png`
 is what that screen looked like on the **pre-fix** binary — the eye-side half of the
 question is still open, and it is named as open.
 
-GPU ring timeouts 12 → 12 across nine runs; no window left on his desktop; his binary
-untouched (`b960621bcc5657e135640e35aa70869f`).
+GPU ring timeouts 12 → 12 across nine runs; no window left on his desktop. **His binary:
+I did not touch it, and it is no longer what it was when this round started** —
+`work/PLAY/out-plain/cmr2` was `b960621bcc5657e135640e35aa70869f` at 07:23 and is
+`97a9eb3b08595858a563282596680401` at 08:20 because the other worker's `out-death` round
+relinked it. My A/B ran `out-owner/cmr2` (the current tree's instrumented build).
