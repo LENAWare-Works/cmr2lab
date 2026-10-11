@@ -1622,3 +1622,21 @@ captures inside one car window is the next run, not this one. The pre-fix captur
 partly inside the car's cells, so it is flagged, not claimed. All of it — with the driver defect
 that caused the three lost measurements, and the tools — in
 `work/MENU-CAR-FLATTENED/CHECKPOINT.md` §21-§25.
+
+### 0i-bis. THE CONTROL THAT MAKES 0i's PNG mean something — appended 2026-10-11 10:4x EEST (same worker, same round)
+
+The car-page PNG in §0i is only evidence if a capture taken the same way can show 3D. It can, and
+inside the **same run**: `frames/opt-preview-camera_20261011-1035_SAME-RUN_next-page_STAGE.png`
+(md5 `aaf7ff5d7f641db95dce7b99d9d1d0c7`, frame 9051, **952 3D draws in flight at that frame**) is
+**21,103 distinct colours, 62.6 % of the frame non-background, a densely shaded scene**.
+
+| capture (same run, same binary, same snapshot path, both with MENUDRAW drawing at that frame) | distinct colours | dominant colour | non-background |
+|---|---|---|---|
+| frame 8517 — the **car page**, 1,377 car draws in flight | 232 | `(140,150,158)` 96.4 % | 3.58 % |
+| frame 9051 — the **next page**, 952 stage draws in flight | 21,103 | white 37.4 % | 62.6 % |
+
+Both pages put thousands of 2D `TL` draws over the 3D (15,767 vs 3,481), so "an opaque 2D backdrop
+drawn after the 3D" explains the car only if that backdrop is page-specific — it does not cover the
+stage. **What is eliminated:** the snapshot path, the index base, the vertex format/stride. **What
+is left:** the car's own fragments (renders in the backdrop colour, i.e. a flat fill) or its draw
+being rejected after submission (depth/z-order on that one page).

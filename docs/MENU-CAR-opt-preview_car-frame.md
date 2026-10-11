@@ -39,3 +39,19 @@ car-shaped, textured, at the right depth — and the presented frame has nothing
 * A pre-fix capture of the same page (`work/RACE/out/owner1.02_t68.ppm`, 07:20, option camera up)
   differs in exactly one region, `x 896..1150 y 167..530`, which is **partly** inside the car's
   cells and partly outside them — so it is not yet attributable to the car. Flagged, not claimed.
+
+## addendum 10:4x — the control, from the SAME RUN
+
+`frames/opt-preview-camera_20261011-1035_SAME-RUN_next-page_STAGE.png` (md5
+`aaf7ff5d7f641db95dce7b99d9d1d0c7`, frame 9051, same run, same binary, same snapshot path, 952
+3D draws in flight at that frame — the pre-race/stage page) measures **21,103 distinct colours,
+62.6 % of the frame not background, a densely shaded full-width scene**.
+
+So inside one run: a capture taken while the menu car's 1,377 draws are running is 96.4 % one
+colour with nothing where the car lands, and a capture taken one page later, with the stage's 952
+draws running, is a fully shaded 3D scene. The snapshot path is not the variable. Both pages draw
+thousands of 2D `TL` draws over the 3D (15,767 vs 3,481), so "an opaque 2D backdrop drawn after
+the 3D" survives as an explanation only if that backdrop is page-specific — it does not cover the
+stage. **What is left standing: the car's own fragments (colour/fill) or the car's draw being
+rejected after submission (depth/z-order on that page), not the index base, not the vertex
+format, not the capture.**
