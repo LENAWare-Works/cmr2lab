@@ -481,3 +481,59 @@ this ticket:
 *(appended by the WHITE-BOX-UNDER-CAR ticket, round 7. If this paragraph is missing on
 re-read, a concurrent writer rewrote the file — the copy is kept at
 `work/WHITE-BOX-UNDER-CAR/progress.md.before-r7`.)*
+
+### the setup-menu car, round 7 — the index fix is not what hides it; CULLING is
+
+The car in the pre-race setup menu is still not right, but this round moved the
+needle for the first time in four rounds, and it moved off the theory you sent.
+
+**Your index-base hypothesis is dead, and it stays dead.** It was already
+measured dead twice (the car's own indices are relative and in range; under
+`A7VK_IDXBASE=sub` the car's vertices come out spread over ±76,000 in NDC — the
+old path IS the mangled flat sheet). Round 7 added no scoping and reverted
+nothing, because nothing needs scoping.
+
+**What round 7 found instead, in two steps.**
+
+1. **The port's backface culling was eating the car.** The owner map that said
+   "the car is on screen, 648 cells, 2,073 triangles" is a *backface-agnostic*
+   software rasteriser: it counts every triangle with a positive w and never
+   tests facing. So a car that is 100 % culled still produces that map, and the
+   screen still shows nothing. The port maps `D3DCULL_CCW` to Vulkan's
+   `CULL_MODE_FRONT` + `FRONT_FACE_COUNTER_CLOCKWISE` once, globally, for the
+   race and the menu alike.
+   **Forcing the cull mode off for indexed 3D draws only, on that page:**
+
+   | capture, same page, same camera, car's draws in flight | distinct colours | content in the car's own cells |
+   |---|---|---|
+   | `frames/opt-preview-car_20261011-1350_CULL-ON_control.png` | 1,205 | 10.0 % (2D chrome only) |
+   | `frames/opt-preview-car_20261011-1346_CULL-OFF_car-visible.png` | **14,159** | **22.0 %** |
+
+   The cull-off frame has a textured **1081 × 258 px band centred on (670, 332)** —
+   wide and low, exactly where the car's cells are — and the control frame has
+   chrome alone. Same binary, same route, one forced state apart.
+
+2. **The menu car's draws are the first thing in the frame, and 375 2D draws
+   follow them** (`[MENUORDER] draws=407 3d=29 first3d=4 last3d=32`), so an
+   overpainting 2D quad is now a named, still-open second suspect — the
+   instrument that would name it is built and running.
+
+**What this does NOT yet claim:** that the hidden object is a *car* rather than a
+shape in the car's place (I measure pixels, I can't look), and the two arms are
+two runs, not two frames of one run. The next step is a same-run, frame-scheduled
+cull switch, and then the real fix — decide the winding per triangle from the
+transform, the way D3D does, instead of trusting one global convention.
+
+**And one warning that matters for every measurement on this box.** Round 7 spent
+40 minutes of its own time proving why five route attempts in a row never got
+past the boot screen: **the game received no keys at all.** The harness's
+keyboard injector creates a synthetic evdev device that this machine will not let
+the game read (`[KB] evdev: /dev/input/event11: Permission denied` — no `uaccess`
+ACL for a device created outside a login session), and the game's own intake
+would refuse it even with access (it scores such a device -2 and only takes
+devices at +3). Keys reach the game only when they are sent **straight to its
+window** (`xdotool key --window`), which is what round 7 switched to. The runs
+that DID progress earlier today must therefore have been taking input from
+*somewhere else* — another lane's injector — which is the same contamination
+`work/DEMO-DRIVE-CRASH` reported at 12:02 from the other side. Anything measured
+on this box through a scripted route carries that caveat, this round included.
