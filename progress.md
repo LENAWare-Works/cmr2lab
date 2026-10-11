@@ -1572,3 +1572,53 @@ the object-space boxes of the parts the draws read are not car-shaped to begin w
 instrument is named in §0g item 4 and in `work/MENU-CAR-FLATTENED/CHECKPOINT.md` §15: the
 **6,258 mesh draws in the same log that are NOT indexed** (`DrawIndexedPrimitiveVB=45705` vs
 `0x2d2 MESH=51963`) and **`A7VK_GEOTRACE`'s device-space box** for the draw that has one.
+
+## 0i. THE OPTION-PREVIEW CAR'S OWN DRAWS, MEASURED — the index base is not what breaks it. appended 2026-10-11 10:3x EEST by the `MENU-CAR-FLATTENED` worker; nothing above was touched
+
+> §0g and §0h measured the option screen with the owner map and the A/B, but **no run had ever
+> printed the menu car's own per-draw numbers**: the burst armed ~5 s late every time, because my
+> round-3 driver re-read the whole 17 MB log on every 0.5 s poll. This round the driver reads the
+> log incrementally and the sampling runs from draw #1 — the option-preview car *is* the first
+> indexed 3D content of the run (`[GEO]`: zero 3D draws at every sample up to f=3360, 1,836 at
+> f=3480, car-shaped object box), so no window has to be hit to measure it.
+
+**1. The car's draws are part-local, in range, 48-byte float — on the shipped default.**
+`out/md_car_raw.log`, 3,012 instrumented `DrawIndexedPrimitiveVB` draws of the car page:
+
+| | value |
+|---|---|
+| stride | 48 on every draw; `fvf=0x2d2` |
+| `idxInRange` | **yes × 3,012, NO × 0** |
+| indices as the backend received them | `2,1,0,3,2,0` … largest index anywhere **44** |
+| `startVert` | 0 on 336 draws, ≠0 on **2,676** — so the switch reaches 89 % of the car's draws |
+| vertex decode | `float48 x[-0.3265..0.3265] y[-0.3265..0.3265] z[-0.1405..0.1405]` — part-sized. The `fixed48`/`fixed32` lines are the **same bits** ×65536 (`-0.3265` → `-16880`), i.e. the data is IEEE float at 48-byte stride and candidate C (16.16-fixed-read-as-float) is dead for the car |
+
+**The ticket's hypothesis is dead on the car itself, measured, not inferred.** `A7VK_IDXBASE=sub`
+would subtract `startVert` from every one of those 2,676 draws whose indices are already
+part-local — the same underflow that broke the race path and that §0h's `sub` run showed as
+`64650,64649,64648`. **No scoping is needed and the fix must not be reverted.**
+
+**2. The same screen, A/B, in the owner map — default keeps the car, `sub` loses it.** Default
+(§0g's `md_raw`, and this round's `md_car_raw`): **599/591/450/648/632/463/658 cells owned =
+17.6-25.7 % of the frame, 2,073 tris, 8 textures, view depth 4.15-5.55 with the camera at 5.00**,
+shape rows 11-28 cols 7-51 (wide and low — a car, side on). `sub` (§0h): **0/2560 cells in 21
+dumps, at most 28/2560 = 1.1 %**, 48 triangles.
+
+**3. One PNG, and it is the first capture taken inside the car's own draw window.**
+`frames/opt-preview-camera_20261011-1035_CAR-FRAME_f8517.png` (md5 `d71a7580459eb9887d834418b367aec5`),
+frame 8517, 1,377 car draws in flight at that frame. It measures **96.417 % one colour
+`(140,150,158)`, 232 distinct colours**, and the region the car's own cells occupy shows **no
+pixel that differs from the backdrop** — the 2D UI (13,462 TL draws) is what is visible.
+
+**What MOVED this round:** item 1 is answered on the car (relative, in range, float — measured);
+item 2's A/B is on the option camera with the car's own draw window identified; item 3 stands
+(no scoping); item 4's PNG exists and is pushed here.
+
+**What did NOT move, said plainly:** the flat car is still unexplained, and a single capture does
+not even establish that it is flat rather than absent — the car renders in the backdrop colour, or
+its fragments never reach the presented image, and this frame cannot tell those apart. Several
+captures inside one car window is the next run, not this one. The pre-fix capture of the same page
+(`owner1.02_t68.ppm`) differs from ours in one region (`x 896..1150 y 167..530`) that is only
+partly inside the car's cells, so it is flagged, not claimed. All of it — with the driver defect
+that caused the three lost measurements, and the tools — in
+`work/MENU-CAR-FLATTENED/CHECKPOINT.md` §21-§25.
