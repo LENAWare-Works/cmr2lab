@@ -10,9 +10,11 @@ Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compati
 > our own code every thirty seconds, the road was drawn from the wrong vertices, and one
 > of our own tools had quietly deleted the two lines that make a car drivable.
 >
-> **It is still not a game you can sit down and play.** The lighting is wrong (four
-> named defects, none fixed), the car in the pre-race setup screen renders collapsed, and
-> nothing legible — road, car, HUD, timer — is claimed on the race picture yet.
+> **A full stage has been driven start to finish** on this renderer, on a Deck. It is
+> still not *right*: the road does not separate from the terrain — one continuous warm
+> field, white-on-white on snow stages — because the port drops the game's per-vertex
+> colours (measured in `docs/ROAD-r6-REPORT.md`). The setup-screen car also renders
+> collapsed.
 >
 > **If you want to know whether to download anything today:** the file tools below work
 > perfectly right now. The port is a laboratory, not a game.
@@ -33,10 +35,10 @@ natively on a Steam Deck (33 of 66 translation units on x86_64, 66 of 66 on 32-b
 compile-level counts, and this repo labels them as such, because there is still no
 runtime proof of the port's correctness).
 
-It also draws, and that sentence has to be exact. `screenshots/` holds real frames of a
-real car built from the retail game files, rendered on a Deck through Vulkan — but the
-**data** is the game's and the **draw code** is this project's own viewer. That viewer
-is not the game. Separately, the game's **own** 3D path now draws: it loads a stage,
+It also draws, and that sentence has to be exact. The game's data files produce a real
+car, rendered on a Deck through Vulkan — but the **data** is the game's and the **draw
+code** is this project's own viewer. That viewer is not the game. (The evidence frames
+were kept in git history but dropped from the working tree to keep the clone small.) Separately, the game's **own** 3D path now draws: it loads a stage,
 builds its own car list, runs its own race loop, and the physics steps at 24 Hz with a
 car accelerating across the world.
 
@@ -61,7 +63,7 @@ public rather than deleted (`docs/ROAD-TEXTURE-OWNER.md` §3 and
 | **Watch the game's own code run on Linux** | ⚠️ Yes — boots to its frontend, loads a stage, runs the race loop | `docs/PLAY-CHECKPOINT.md` |
 | **A session that lasts longer than two minutes** | ✅ **Yes, since 11 Oct** — the GPU bug that ended every run is fixed | `docs/GPU-LIFETIME-FIX.md` |
 | **A car you can actually drive** | ⚠️ **Yes again since 11 Oct 11:02** — our own tool had broken it for 2½ hours | `docs/DRIVE-LOOP-REGRESSION.md` |
-| **Lighting that looks like the original** | ❌ No — four named defects, none fixed | `docs/DEATH-AND-LIGHT.md` |
+| **Lighting that looks like the original** | ❌ No — the road's per-vertex shading is dropped | `docs/ROAD-r6-REPORT.md` |
 | **The car in the setup screen** | ❌ No — it renders collapsed | `docs/MENU-CAR-EVIDENCE.md` |
 | **Half the game's code compiling for Linux** | ✅ 33 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
 | **The other half compiling** | ❌ Not yet — pointer-width work, 1,377 sites | `docs/P3-P1-REPORT.md` |
@@ -332,7 +334,9 @@ In rough order, and every item here is a real plan rather than a wish:
 | `tools/fixes/` | the five fixes, as runnable patch scripts |
 | `progress.md` | the live status page — rewritten whole each round |
 
-**New here? Read `docs/GLOSSARY.md` first.** If a word in this README was unfamiliar, it's
+**New here? Read [`docs/STATUS.md`](docs/STATUS.md) (one screen, can-I-use-it), then
+[`docs/INDEX.md`](docs/INDEX.md) (a map of every doc), then `docs/GLOSSARY.md` for any
+unfamiliar term.** If a word in this README was unfamiliar, it's
 defined there — D3D7, RHI, translation unit, triangle list, byte-identical, all of it.
 
 ---
