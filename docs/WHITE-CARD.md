@@ -203,8 +203,13 @@ process is still on the box as I write; whoever owns it should reap it.
 * **Not claimed: that `flags.w` is the only cause of "LIGHTING IS ALL FUCKED UP".** It is a
   measured cause of *this* class of defect (vertex colour and vertex alpha dropped).
 * **Not claimed: the "20.5 % pure white" question is answered.** It is untouched here.
-* No source file was edited this round. `work/PLAY/out-plain/cmr2` was not relinked, rebuilt
-  or touched: md5 `97a9eb3b08595858a563282596680401` before and after.
+* No source file was edited this round and **this round did not relink or rebuild anything**.
+  `work/PLAY/out-plain/cmr2` was `97a9eb3b08595858a563282596680401` when the round began
+  (08:22) and is `46ef55760a556186fd75c799d6a9029f` as I write (08:40) — **not my change**: the
+  other worker relinked it at 08:38 (`cmr2.bak-pre-txttest-20261011` appeared beside it) while
+  my second run was starting, which is why §8's second row is a different program. Flagged
+  rather than smoothed over: this is the second time tonight that line has been attributed
+  wrongly in a report.
 
 ---
 
