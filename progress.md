@@ -25,6 +25,87 @@ Paths, so they line up on both ends:
 |---|---|
 | the install | `~/lena/.lena_cmr2/game` (**638 MB** retail PC install; 259 `.c3d`, 220 car containers. It said 2.26 GB here — that was the disc-image copies in `gamedata/`, corrected §0b/§6) |
 
+## 0h. NEITHER SIDE OWNED IT — the road textures ARE asked for and ARE bound; the port drew them from the wrong vertices. added 2026-10-11 06:0x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**One line: the game asks for `RD_GA`/`MRG_KN*`/`MOU_TER4A`/`TER_421C` on every frame of
+a race and the port binds exactly those textures — the fault is one line lower, in
+`DeckDevice7::DrawIndexedPrimitiveVB`, which re-bases index arrays that `Mesh_BuildParts`
+had already re-based; of 404,000 indexed draws with a non-zero base, 404,000 (100.00 %)
+fit the game's convention and 0 fit the port's.**
+
+Full write-up: `docs/ROAD-TEXTURE-OWNER.md`. Every number is from tonight's runs, **12 →
+12 GPU ring timeouts in all seven**, a race reached in every one.
+
+### The question, and the answer that is not (i) or (ii)
+
+The round was handed: *of the 40+ Kenya track textures only `TER_KN4A` and `GR_001` are
+ever bound in a race; every `RD_*`/`MR_*` has cov=0.0 and draws=0 — is that the game's
+material selection, or a query the port answers wrongly?* The instrument that decides it
+(`DECK_TEXREQ`, joined on the **surface pointer**) says:
+
+```
+RD_GA.DDS  slot 88 -> texId 102:   game asks 1288    port binds 1288    skip 0
+                                   port draws 2000    port coverage 0.0 screens
+```
+
+**The game asks** — 1,288 requests for `RD_GA` in one window, `partsSlotNull=0`,
+`oob=0`, and the mesh-level trace names the part tables (`[p0 slot=81 name='…TER_KN4A.DDS']`).
+That rules out the c3d trailer index, the submesh split and the track's material table.
+**The port answers correctly** — the surface the game hands to `SetTexture` is the
+surface the port uploads and ids, and `a7vk_combo_set` keys its descriptor set on the
+texId, so a draw samples its own texture. What the port then does with it is the bug:
+
+```c
+/* "D3D's indices are absolute into the vertex buffer" — they are not. */
+idxScratch[i] = (uint16_t)(idx[i] - startVert);
+...  v->data + (size_t)startVert*stride ...      /* the two cancel: startVert is lost */
+```
+
+`Mesh_BuildParts` (Mesh.cpp) already does `pData[k] -= minIndex` and
+`Graphics_DrawMeshPartsByTexture` passes `startVert = vertexOffset + minIndex`, so the
+array handed to the driver is already relative. Measured (`DECK_IDXTRACE=1`, one run):
+`draws(startVert!=0)=404000  rawInRange=15969393/15969393  usedInRange=349174
+relOk=404000 absOk=0`, with the giveaway line
+`startVert=840 numVerts=116 numIdx=156 raw[0..115]` — indices that are *exactly* the
+window they were handed for.
+
+### The old cov=0.0 line was an instrument artefact, twice
+
+`A7VK_TEXUSE` printed only the **top ten** ids by coverage (all ten taken by near-plane
+blow-ups) and selected them by **`cov > 0.0`** — which hides a texture that was bound and
+drawn 2,000 times and added no area. Two additive patches (`patch_texuse4/5.py`) lift
+both filters; a third (`patch_texuse6.py`) reports *why* each draw added nothing.
+
+### The fix, A/B'd in one build, and what it changed
+
+`A7VK_IDXBASE=sub` restores the old path; the default is now the corrected one.
+
+| | before | after |
+|---|---|---|
+| `RD_GA` (id 102) port coverage | 0.0 screens | **347,599.57 screens** (same 2,000 draws) |
+| `MRG_KN1` / `MOU_TER4A` | 0.0 / 0.0 | 237,993.76 / 210,545.06 |
+| frame at t=78, clear-colour pixels | 57.9 % | **0.0 %** |
+| frame at t=78, distinct sampled colours | 817 | **2535** |
+
+The road textures now own the largest coverage in the frame instead of none.
+
+### What is deliberately not claimed
+
+**The picture has not been checked against a reference.** What is measured is that the
+road's draws project real area and the frame is no longer more than half clear-colour.
+Whether the framing and the near plane are what a Kenya stage should look like is the
+next question, and it needs a picture beside the numbers.
+
+### Inertness, and his binary
+
+`work/PLAY/out-plain/cmr2` = `work/RACE/out-texreq/cmr2` =
+**`b960621bcc5657e135640e35aa70869f`** (previous, `e43d7a1e…`, kept as
+`cmr2.bak-pre-idxbase-20261011`). With every new variable unset: **0 lines** from
+`[TEXREQ]`, `[IDXTRACE]`, `[TEXUSE]` and `[SURF]`, stage still reached
+(`0x2d2 MESH=417596`), no window left on his desktop, no stray process.
+
+---
+
 ## 0g. THE PAINT IS FIXED. added 2026-10-11 04:3x EEST by the `work/RACE` worker; appended, nothing above or below it touched
 
 **One line: every stage texture is DXT5 and the port was copying the *compressed
