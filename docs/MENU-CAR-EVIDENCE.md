@@ -324,3 +324,204 @@ journal says, offered to worker 1's ticket, not claimed as mine):
    anything.
 4. Only if (3) needs the setup screen specifically: `run_menuhunt.sh`, whose whole idea is
    that `owner1–owner5` reached that screen by accident with keys, so keys are the route.
+
+---
+
+# ROUND 2 ADDENDUM — `MENU-CAR-EVIDENCE-VISION`, 2026-10-11 08:5x–09:1x EEST
+
+Round 1 of this task wrote §0–§9 above and stopped on the step limit. **No GPU run this
+round either** — Miami was driving (verified below), so this is again all bytes on disk.
+Two things changed on the box after §5 was written, and one of them overturns part of it.
+
+## 10. THE TEXT ITEM — RE-ANSWERED, AND PART OF §5 IS NOW WRONG
+
+§5 said the missing labels are "not a missing text path". That is still true of the *path*.
+It is no longer the whole answer, because **there was a fatal defect on that screen's text
+placement path, and it was fixed 13 minutes after §5 was written.**
+
+1. **The defect.** `OptionMenu_TransformHudPointToScreen` (CMR2 `0x00503b70`, definition
+   `GameInfo.cpp:6068`) was declared **`int`** in every build of the port and **never
+   returned a value**. clang synthesises `ud2` for a non-void function that falls off its
+   end, so **every call died with SIGILL** — the body's work done, then the process killed.
+   Backup on disk proving the before-state:
+   `GameInfo.cpp.bak-pre-missingreturn-20261011` line 6068 reads `int`, the live file reads
+   `void`. The prototype in `RallyData.cpp:7132` always said `void`; the definition did not.
+2. **It is on the option screen's text path, and it is called twice per icon.** Both call
+   sites are inside the loop in `RallyData.cpp` that places the option menu's labels:
+   `RallyData.cpp:7210` (guarded by `g_unk0x0082ca04[i] == 100` → literally
+   `OptionMenu_DrawTransitionTextShortCoords(..., CFrontend::GetTextString(0xfe),
+   rect[0], rect[1], ...)`) and `RallyData.cpp:7237`. The x/y handed to the text call are
+   the ones that function just wrote. There is no way to place that label without calling it.
+3. **She photographed a build that had it.** Her message is timestamped **07:35 EEST**; the
+   `int`→`void` fix was built and swapped in at **08:53** (`work/PLAY/out-plain/cmr2`,
+   md5 `d26a09231a98ebb25b6da8b664275f87`). So the binary her photos came from is the
+   pre-fix one, by 78 minutes.
+4. **It was still firing this morning, in his own session.** `coredumpctl list` shows the
+   last two SIGILLs at **08:40:03**, both from
+   `/home/deck/lena/work/PLAY/out-plain/cmr2` — his play binary, 13 minutes before the fix.
+   Those are the only ILL entries anywhere near this window; nothing SIGILLs after 08:53.
+5. **BUT — and this is why §5 is only half-wrong — text does draw on that screen.**
+   Measured on a local capture of a menu screen from a pre-fix build (§11): the frame
+   contains antialiased glyph strokes. `(125,131,138)` is 2,370 px in **1,115 components**,
+   the largest of which is **17 px = 1 wide × 17 tall** — a 1-px-wide vertical stroke
+   13–17 px high is a character, not a shape. `(109,114,118)` is the same picture
+   (2,036 px / 1,150 components / largest 13 px = 1×13). `(79,79,79)` is 11,190 px in 1,426
+   components. So the frontend text pipeline renders on at least one page of this menu on a
+   pre-fix build.
+
+**So the honest answer to her optional item, which she asked me to state one way or the
+other: text draws in general, and her page may still be the trap.** The discriminating test
+is one run on the current build: reach the option screen and look. If text appears on the
+page she photographed, the trap was hers; if the page is still bare while another page has
+text, it is the page. **Nothing in the pixels can settle it and nothing here claims it.**
+
+## 11. THE FIRST LOCAL CAPTURE OF THAT SCREEN — measured, not described
+
+Round 1 §1 recorded that no capture in this repo shows her patch, and that `owner1…owner5`
+were the only runs whose camera set includes the option menu's
+`eye=(0.14 -0.09 -5.00)`. **Those runs have captures on disk, and round 1 did not read them.**
+`out/owner1.02_t68.ppm`, `.03_t83.ppm` and `.04_t98.ppm` are 1280×800 frames taken at
+**07:20:40, 07:20:56 and 07:21:12**, at frames 3996, 4883 and 5798, all with the
+option-menu camera. They are from a pre-fix build (`out-owner/cmr2`).
+
+New tools this round: `shard_bbox.py` (where is the content, per colour family, with
+row/column profiles), `shards.py` (per exact colour: 4-connected component count, largest
+component, fragment count), `region_map.py` (a crop as letters, one letter per exact colour,
+background blanked). Everything below is counted.
+
+* **The frame is one flat colour.** `(140,149,158)` is **956,980 px = 93.455 %** of the
+  frame — and it is **956,980 px in all three captures**, 800 and 1,800 frames apart, along
+  with `(79,79,79)=11,190`, `(116,64,50)=5,342`, and whole-family counts identical
+  (`r=21,643 k=16,010 O=5,501 g=2,615`). Only the grey/white families differ between them.
+  So: a static screen, ~93.5 % empty, with one small animated white/grey element.
+* **Content sits in four bands**: y46–85 (top), y186–275, y606–635, y666–725 (footer).
+  Non-background bbox `x[56..1223] y[46..756]`.
+* **The flat, unshaded, straight-edged fragment cluster is real, and it is in the upper
+  right.** Four-plus distinct flat tones with **no gradient between them**, all inside
+  `x[902..1150] y[187..269]` (250 × 83 px = 19.5 % × 10.4 % of the frame):
+  `(116,64,50)` 5,342 px in **65 components**, largest 1,988 px, bbox `x[902..992] y[187..251]`
+  (91×65); `(151,86,69)` 3,713 px in 63 components, largest 724 px; `(94,55,41)` 2,288 px in
+  19 components, largest 911 px; plus saturated yellow `(255,219,14)` and black. Large flat
+  wedges with hard straight edges, adjacent, unshaded — **the same class of object she
+  described, at 19.5 % × 10.4 % rather than 10–15 % × 10–15 %, in the upper right rather
+  than below centre.** I am not going to pretend that is the same patch. It is either a
+  different element on a different page, or her position description is loose; §13 asks her
+  for the one thing that decides it.
+* **No car anywhere in the frame.** No silhouette, no roofline, no wheel arches, no wheel,
+  and no two-sided object — at any of the three captures, by colour family or by map.
+* Note what both pictures have in common: **flat colour, hard edges, no shading, no
+  perspective.** Hers has the livery in it. Mine has UI plates three times in a column at
+  `x[598..636]`, `y≈270, 349, 421` — `(255,255,255)`, 36×20 px each, black-outlined
+  (`shards.py`: 4,615 px in 79 components, largest 523 px `x[601..636] y[349..368]`).
+
+## 12. THE MEASUREMENT THAT CHANGES THE RANKING — draws, but no triangles
+
+Round 1 §4 ranked four mechanism families and picked the instrument that separates them
+(A world/view for the preview; B the preview's own deform path; C stride/FVF on the 32-byte
+fixed buffers; D 2D-over-3D ordering). **This run's owner map, read end to end, moves B to
+the front and does it without needing the menu to be photographed.** From `out/owner1.log`,
+the owner-map line at every dump (frame in brackets):
+
+| frame | cells owned | draws | triangles |
+|---|---|---|---|
+| 200–2800 (13 dumps) | 0 / 2560 | 0 | 0 |
+| **3200** | **711 / 2560 (27.8 %) by 8 textures** | 6,757 | **489,067** |
+| **3600** | **711 / 2560 (27.8 %) by 8 textures** | 9,628 | **207,801** |
+| **4000, 4800, 5800 …** | **0 / 2560** | **9,628** | **0** |
+
+**The same 9,628 draws that put 207,801 triangles on screen at frame 3600 put zero there by
+frame 4000, with the camera unchanged at `eye=(0.14 -0.09 -5.00)` and `0 tris behind eye`
+reported.** The captures in §11 are at frames 3996, 4883 and 5798 — i.e. **inside the
+zero-triangle window**, which is why they are 93.5 % flat and why there is no car in them.
+
+Geometry that is submitted and rasterises nothing is not a wrong index base (that produces
+*wrong* triangles, loudly — 91 % of the frame at frame 2450, §3) and it is not a world/view
+that is merely misplaced (that produces *displaced* triangles, her "nothing off-screen"
+notwithstanding). It is what **degenerate geometry** looks like: vertices collapsed onto a
+point, a line, or a plane, so the triangles have ~zero area and the rasteriser drops them —
+and a *near*-degenerate version of exactly that is jagged fragments compressed into a small
+area, still wearing the mesh's own paint, with nothing fanning off and nothing off-screen.
+That is her picture, and it is the deform path (§4 family B), the one piece of code in the
+game that **moves and re-uploads preview vertices every frame**:
+`OptionPreview_RebuildDeformedGeometry` (`GameInfo.cpp:8147`, twelve generated corners →
+camera plane → per-vertex limit normals) and `CarDamage_ApplyCameraSpaceMeshDent`
+(`StageTiming.cpp:5340+`, radius/falloff arithmetic in 16.16 fixed point), both ending in
+`Mesh_Rebuild` (`Mesh.cpp:103`), which re-`memcpy`s the whole vertex array into the shared
+buffer. Miami's own words for the result were "one flat piece of paper". I have **not**
+found the bug in that code and I am not going to claim one off a read; I am saying the
+measurement now points there, and §4's `LENA-MENUDRAW` spec is the instrument that proves it
+in one run (per-draw object-space bbox vs screen-space bbox: a car-sized object-space bbox
+with a few-hundred-px screen bbox is A; an object-space bbox that is itself a point or a
+plate is B).
+
+## 13. THE TIMELINE — where her photos sit, and why that matters
+
+| time (EEST) | event |
+|---|---|
+| 07:19:42–07:21:12 | `owner1` captures the option screen, frames 679 / 3140 / 3996 / 4883 / 5798 — **the only local pictures of that screen family** |
+| **07:25:40** | `[gfxhub] page fault`, `Process cmr2 pid 498908` → `ring gfx_0.1.0 timeout` → **MODE2 reset** |
+| **07:31:49** | `[gfxhub] page fault`, `Process cmr2 pid 501251` → **MODE2 reset** — the display death |
+| **07:35** | her message, with the two photos |
+| 08:40:03 | two **SIGILL** coredumps, `out-plain/cmr2` — the `ud2` (§10.4) |
+| 08:53 | `int`→`void` fix built and swapped in; md5 `d26a09…` |
+| 08:57 | Miami launches that binary — the fixed build, live |
+
+Two things follow. **First**, her photos are from a session that was 4–16 minutes from two
+hard GPU resets and that ended in them; the closest local capture to her photos is a *clean*
+pre-fault one, so the shards are **not** a reset artefact — they were on the screen before
+any fault. That is a negative control in the good direction, and it is worth more than the
+coincidence is. **Second**, "no menu text" now has two live candidates and no way to pick
+between them from here: the `ud2` on that page's text placement (§10), or a phone photo of a
+screen (blur/moiré). Her phone has the capture timestamp in the file metadata. **That is
+the cheapest thing anyone can give me and it is the first thing I would ask for.**
+
+## 14. WHAT I DID NOT DO, AND WHY — plainly
+
+* **No game run.** Miami was driving the whole round: `ps` shows `cmr2` pid **588344**
+  (started 08:57:12) with ppid **1374 = `systemd --user`**, cgroup
+  `user.slice/user-1000.…`, and **no entry in `~/.lena_harness/own.d/`** — a foreign game by
+  the guard's own rule. `sh gpu-guard.sh --list` agrees: `588344 FOREIGN cmr2
+  /home/deck/lena/work/PLAY/out-plain/cmr2`. The phone ranks the display death first; I did
+  not queue behind it, I stayed out of it.
+* **The A/B she asked for is still not run, and it is still runnable.** Verified rather than
+  assumed, because worker 1 rebuilt the play binary at 08:53 and a rebuild is where a
+  diagnostic switch silently disappears: **`A7VK_IDXBASE` is still in the live binary**
+  (`strings` finds it in `out-plain/cmr2`) and still live in source at `deck_dd7.cpp:1421`
+  (`ib_raw = (e && e[0]=='s') ? 0 : 1` — unset or `raw` → the corrected default
+  `startVert + idx`; `sub` → the old re-base). So the discriminating pair survives the
+  rebuild and costs one run.
+* **`gpu-guard.sh` is mode 644 and that is NOT a bug.** I found it non-executable and went
+  to fix it; `drive.py:52`, `mc_drive.py` and `menu_hunt.py` all invoke it as
+  `subprocess.run(["sh", GUARD, …])`, so the bit is irrelevant to the yield path. Left alone.
+* **I did not identify which page of the menu her screen is.** The camera identifies the
+  screen family, not the page. Unresolved, and marked unresolved.
+
+## 15. WHAT I WOULD HAND HER, IN ORDER (round 2)
+
+1. **The `ud2` — one sentence, because it orphans her one unverifiable item.** The option
+   screen's text-placement function was a decompiled function with no return; every call
+   was SIGILL; her photos predate the fix by 78 minutes. It is fixed and live. Text does
+   draw on that screen on the pre-fix build (§10.5), so this is a candidate, not a proof —
+   and it is now testable.
+2. **The screen's 3D stops rasterising** (9,628 draws / 0 triangles / 93.5 % flat, §12) —
+   the first measurement on this screen that points somewhere specific, and it points at the
+   deform path (§4 B), not at the index base (§2, still dead). One run of `LENA-MENUDRAW`
+   proves or kills it by comparing the object-space and screen-space bbox of one draw.
+3. **Ask her for the photo timestamps** (not a better photo — the timestamps). They decide
+   whether her picture is a pre-fault clean frame or the reset aftermath, and that decides
+   whether the shards are geometry or transport.
+4. Then the A/B, on a frame that actually shows the screen this time (§3's control shows the
+   switch is loud — 91 % of the frame — when the 3D is real, and inert when it is not).
+
+## 16. FILES ADDED THIS ROUND
+
+| file | what it is |
+|---|---|
+| `shard_bbox.py` | background + non-bg bbox, per-family count/bbox, row & column profiles |
+| `shards.py` | per exact colour: 4-connected components, largest, fragment count, bboxes |
+| `region_map.py` | a crop printed as letters, one per exact colour, background blanked |
+| this §10–§16 | appended to `MENU-CAR-EVIDENCE.md`, not a replacement for §0–§9 |
+
+Nothing of worker 1's or worker 2's was modified. No source edited, no binary built or
+copied, no run started, no window on his desktop. Kernel ledger unmoved at
+`gfx_0.0.0 timeout = 12`; the two `gfx_0.1.0` + `MODE2` events are the 07:25/07:31 pair.
