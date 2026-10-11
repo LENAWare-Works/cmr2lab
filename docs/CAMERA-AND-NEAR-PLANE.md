@@ -167,8 +167,8 @@ do not come back identical — "it produced a file" is not "the file is the pict
 
 | file | frame | what the measurement says it is |
 |---|---|---|
-| `race-sky_1800_owner4.png` | 1800 | 54,358 distinct colours; blue-dominant sky across the top 8 of 40 rows, green vegetation left, warm terrain, white patches. Depth p50 19.1 units |
-| `race-sky_3800_owner4.png` | 3800 | 51,707 distinct colours; same composition class, different camera |
+| `race-sky_1800_owner4.png` | 1800 | 54,358 distinct colours; blue-dominant sky across the top 8 of 40 rows, green vegetation left, warm terrain, white patches. Frame depth (nearest dump, 1850, composite in that build): p50 19.1 units |
+| `race-sky_3800_owner4.png` | 3800 | 51,707 distinct colours; same composition class, different camera (nearest dump 3750: depth p50 12.7 units) |
 | `race-closeup_3100_owner6.png` | 3100 | 39,101 distinct colours, 93.3% warm; the Kenya dirt stage — the map 50 frames later has `KEN_1A` at 33% and `RD_GA` at 12.3% |
 | `frontend_1900_owner6.png` | 1900 | the frontend, for contrast: 97.0% blue, **153 distinct colours in the whole frame** |
 
