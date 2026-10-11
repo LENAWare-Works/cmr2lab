@@ -14,6 +14,10 @@ a working game with one big known visual defect.
   demo walks itself into a race. *Pressing a key parks it on the frontend — that is not
   a crash, it is the wrong door.*
 
+![The game's frontend running natively](media/frontend.jpg)
+
+*The game's own frontend, running natively on a Steam Deck.*
+
 ## What is broken (and why it looks like it does)
 
 **The road does not separate from the terrain.** Every stage renders as one continuous

@@ -1,5 +1,7 @@
 # CMR2LRE
 
+![CMR2LRE](docs/art/banner-1600x400.png)
+
 **Colin McRae Rally 2.0 — Linux Rally Edition.**
 Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compatibility layer.
 
@@ -17,8 +19,8 @@ Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compati
 
 > **11 October 2026.** The game boots its own frontend, loads a real Kenya stage off
 > disk, and drives a car with the game's own physics — on this project's renderer, on a
-> Steam Deck. **Four things that were broken are fixed and measured as of today** (jump
-> to *What changed*): the stage's textures were never decoded, the GPU was being reset by
+> Steam Deck. **Four things that were broken are fixed and measured as of today** (see
+> *Recent fixes*): the stage's textures were never decoded, the GPU was being reset by
 > our own code every thirty seconds, the road was drawn from the wrong vertices, and one
 > of our own tools had quietly deleted the two lines that make a car drivable.
 >
@@ -49,10 +51,24 @@ runtime proof of the port's correctness).
 
 It also draws, and that sentence has to be exact. The game's data files produce a real
 car, rendered on a Deck through Vulkan — but the **data** is the game's and the **draw
-code** is this project's own viewer. That viewer is not the game. (The evidence frames
-were kept in git history but dropped from the working tree to keep the clone small.) Separately, the game's **own** 3D path now draws: it loads a stage,
-builds its own car list, runs its own race loop, and the physics steps at 24 Hz with a
-car accelerating across the world.
+code** is this project's own viewer. That viewer is not the game.
+
+| Four cars, built from the retail files | One car, four angles |
+|---|---|
+| ![Four cars from Colin McRae Rally 2.0, drawn by this project's viewer](docs/media/car-4cars.jpg) | ![A single car model shown from four angles](docs/media/car-4views.jpg) |
+
+*Both images are the project's **viewer**, not the game — the geometry and textures are
+CMR2's, the renderer is ours.*
+
+Separately, the game's **own** 3D path now draws: it loads a stage, builds its own car
+list, runs its own race loop, and the physics steps at 24 Hz with a car accelerating
+across the world.
+
+![A race frame from the native port](docs/media/race-frame.jpg)
+
+*The game's own renderer running a stage on a Steam Deck. The road does not separate
+from the terrain yet — that is the open lighting bug, named in
+[`docs/ROAD-r6-REPORT.md`](docs/ROAD-r6-REPORT.md).*
 
 Nothing here is a mock-up and nothing here is a rendering of what we hope it will look
 like. Where a number appears in this repository, the log, tool or command that produced
@@ -83,100 +99,16 @@ public rather than deleted (`docs/ROAD-TEXTURE-OWNER.md` §3 and
 **Full current status, rewritten whole each round so it cannot contain a stale claim
 above a fresh one: [`progress.md`](progress.md).**
 
+## Recent fixes
+
+Four bugs were found and killed on 10–11 October, each with a number that says it
+worked — the stage's textures were never being decoded, the GPU was being reset by our
+own code every thirty seconds, the road was drawn from the wrong vertices, and one of our
+own tools had quietly deleted the two lines that make a car drivable.
+
+**Full write-up, with the measurements:** [`docs/FIXES-20261011.md`](docs/FIXES-20261011.md)
+
 ---
-
-## What changed on 10–11 October
-
-Four fixes, in the order they happened. Each one has the number that says it worked.
-
-### 1. The stage's textures were never decoded
-
-The port was copying the **compressed blocks** of a DXT5 texture into a 32-bit surface
-as if the bytes were pixels. Every road, verge, terrain, grass, tree and building
-texture in the game went through that copy. The game itself never decodes DXT — it hands
-the blocks to a blit and expects the graphics driver to convert them, and this port's
-blit did nothing.
-
-Every DDS texture in the retail install is DXT5: a sweep of all 581 readable `.bfl`
-containers found **7,804 DDS entries, every one DXT5, zero of any other format**.
-
-**Before:** the ground band measured mean `(142, 171, 159)` — chromatic noise.
-**After:** `(115, 90, 15)`, against the terrain texture's own mean of `(116, 89, 17)`.
-The decoder agrees with `ffmpeg` on alpha (4096/4096 texels) and to one least-significant
-bit on colour. → [`docs/DXT-COPY-PATH.md`](docs/DXT-COPY-PATH.md)
-
-### 2. The GPU was being reset by our own code, every run, at about thirty seconds
-
-The game's own log just stops. The kernel log names it: `Faulty UTCL2 client ID: TCP`
-— the texture cache pipe — reading from a page that is not mapped. A shader that faults
-never finishes, the ring times out, the kernel resets the GPU, and the desktop's
-compositor dies with it. Two lifetime bugs, both ours: a texture's memory freed while a
-frame in flight could still be sampling it, and an upload path that reset and re-recorded
-**the frame's own command buffer** while the queue was still executing it. A second,
-independent hole in the same class was found the next morning, when the player's display
-died mid-session: a descriptor-set cache that could hand out a set naming an image view
-that had just been destroyed.
-
-**Before:** every run died at ~30–40 s, thirteen GPU resets in twenty-four minutes —
-including one run with no instruments attached at all, so it was never the test harness.
-**After:** 360 seconds of continuous stage, **6,344,401** mesh draws, 72.7 million
-triangles, **zero GPU resets, zero page faults, no display loss.**
-→ [`docs/GPU-LIFETIME-FIX.md`](docs/GPU-LIFETIME-FIX.md), [`docs/DEATH-AND-LIGHT.md`](docs/DEATH-AND-LIGHT.md)
-
-### 3. The road was drawn, and drawn from the wrong vertices
-
-`DrawIndexedPrimitiveVB` shifted the vertex base by `startVert` *and* subtracted
-`startVert` from every index — the two cancel, so `startVert` is lost. The game's own
-loader had already rebased those indices; the port rebased them a second time.
-
-Of **404,000** indexed draws with a non-zero base, **404,000** fit the game's convention
-and **0** fit the port's. The road texture `RD_GA` measured 0.0 screens of coverage
-before the fix and **347,599.57** after — the largest single coverage in the frame.
-(The earlier claim that "every road texture has zero coverage" had been an artefact of
-the measuring instrument, twice over; §3 of the document retracts it.)
-→ [`docs/ROAD-TEXTURE-OWNER.md`](docs/ROAD-TEXTURE-OWNER.md)
-
-### 4. And one we did to ourselves: for two and a half hours, no car could be driven
-
-**This one belongs in the open, so here it is in plain words.**
-
-On 11 October at **08:39:06**, our own tracing tool (`patch_racetrace.py`) used two real
-statements of game code as the **anchor** for a text replacement:
-
-```c
-    Physics_UpdateRateHold();
-    g_unk0x00538124 = Car_UpdateEngineNoteFalloff(&g_unk0x00537f60);
-```
-
-and the replacement block did not contain them. So applying the patch **deleted them**.
-The second statement assigns the bound of the per-car driving loop. With it gone the loop
-never ran a single iteration: no car was ever given an input, the physics never stepped,
-and every car sat frozen — **in a binary that still booted, still presented frames, and
-still looked like a game.**
-
-The dead window is **08:39:06 → 11:02**. Four builds were in that state, including
-`work/PLAY/out-plain/cmr2` — **the binary the Desktop icon launches.** The session the
-player clicked into at 10:03 was a frozen world, and he was right to say so.
-
-The statements were never missing from the port: they are in the upstream decompilation
-and in every backup before that timestamp, and the tool's own two backups — taken either
-side of the patch, byte-identical to each other — are what prove the deletion. They were
-restored, and the restore was measured, not assumed: the loop now iterates **3,650**
-times in a 220-second run, the physics steps at **~24 Hz**, and car 0 accelerates to
-speed **101,958** and travels across the world. Before: `steps=0`, speed `0`, every frame.
-
-**And so it cannot happen again quietly**, the launcher now asks the *file* whether it can
-drive a car before starting it at all (`tools/drivecheck.sh`), refuses to start anything if
-no candidate passes, logs every launch with its md5, and the build script will not install
-a binary that fails the check (`tools/build-play-lre.sh`). A hardcoded order would have
-rotted within the hour — in this workspace a binary *path* is a name, not a build.
-
-**What that run also shows, honestly:** the car drives fast for about 1,600 frames, then
-grinds in place with the throttle on for ~36 seconds, then the demo ends and another
-starts. So *"she can't drive for shit"* is not a crash loop — it is a car that stops
-making progress. Whether that is scenery or an AI with nowhere to go is an open question,
-and it is written down as one rather than as a finding.
-→ [`docs/DRIVE-LOOP-REGRESSION.md`](docs/DRIVE-LOOP-REGRESSION.md), [`docs/LAUNCHER-DEAD-BUILD.md`](docs/LAUNCHER-DEAD-BUILD.md)
 
 ---
 
@@ -386,3 +318,4 @@ the port work; the phone one does the archaeology and writes things down.
 Both of them read the actual files rather than remembering what's in them, which sounds
 like a low bar until you watch how often it matters. The four fixes in this README are
 what that produces — including the fourth one, which was ours.
+

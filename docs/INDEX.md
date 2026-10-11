@@ -10,6 +10,7 @@ read `STATUS.md`.
 - `STATUS.md` — can I use this yet? The honest answer, first screen.
 - `GLOSSARY.md` — every term in plain English (terminal, clone, bfl, DXT5, D3D7, RHI…).
 - `WHERE-THIS-IS-GOING.md` — the roadmap.
+- `FIXES-20261011.md` — the four bugs fixed on 10–11 October, with their measurements.
 - `CONTROLS.md` — controls and modes.
 - `MODES.md` — game modes.
 
@@ -55,6 +56,7 @@ they exist so nothing is lost, not because you need to read them in order.
 
 ## Internal and archive
 
+- `media/` — the images used in the README and STATUS page.
 - `notes/` — working notes passed between contributors. Kept for the record, not
   part of the documentation.
 - `README-ARCHIVE.md` — the original README, preserved verbatim.
