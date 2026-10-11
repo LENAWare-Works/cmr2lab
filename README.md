@@ -3,6 +3,18 @@
 **Colin McRae Rally 2.0 — Linux Rally Edition.**
 Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compatibility layer.
 
+> ### New here? Start with these three.
+>
+> | | |
+> |---|---|
+> | **[`docs/STATUS.md`](docs/STATUS.md)** | **One screen. Can I use this yet? Read this first.** |
+> | [`docs/INDEX.md`](docs/INDEX.md) | Every document in this repo, mapped and explained |
+> | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every unfamiliar term, in plain English |
+>
+> Then come back here — the rest of this page is the detail behind those three.
+
+---
+
 > **11 October 2026.** The game boots its own frontend, loads a real Kenya stage off
 > disk, and drives a car with the game's own physics — on this project's renderer, on a
 > Steam Deck. **Four things that were broken are fixed and measured as of today** (jump
@@ -334,9 +346,8 @@ In rough order, and every item here is a real plan rather than a wish:
 | `tools/fixes/` | the five fixes, as runnable patch scripts |
 | `progress.md` | the live status page — rewritten whole each round |
 
-**New here? Read [`docs/STATUS.md`](docs/STATUS.md) (one screen, can-I-use-it), then
-[`docs/INDEX.md`](docs/INDEX.md) (a map of every doc), then `docs/GLOSSARY.md` for any
-unfamiliar term.** If a word in this README was unfamiliar, it's
+**Still reading? [`docs/INDEX.md`](docs/INDEX.md) maps every document in this repo —
+reference first, then the engineering journal.** If a word in this README was unfamiliar, it's
 defined there — D3D7, RHI, translation unit, triangle list, byte-identical, all of it.
 
 ---
