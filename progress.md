@@ -879,6 +879,43 @@ position (offset 0), normal (12) and diffuse (24, written by the game's own `Mes
 
 ---
 
+### setup-menu car r11, addendum 15:3x — **the UV column was MY bug, not the port's; and depth is not what hides the menu**
+
+Run 2 (`md_mtex3`, `out-md11/cmr2` md5 `629228b9c3211556157004feddcb4987` — the same instrument with
+the UV column printed as **hex**, and `LENA_MENUZ=0` so every indexed 3D draw of the car is drawn
+with `D3DRS_ZENABLE` forced off and the game's value restored right after: the gate's own init line
+is in the log, so the treatment happened).
+
+**1. The UVs are real, and the block above is retracted.** `uv0=3f6c9100,3e82a400=(0.924088,
+0.255157)` — 603 samples, **52 distinct u values and 56 distinct v values** — and that first one is
+the `.c3d` record-2 UV `(0.9241, 0.2552)` from the file dump, to four decimals. My first cut printed
+that column with `%g` on a value the compiler delivered differently and got `3.3609e-309` for every
+vertex, which I flagged as unquotable in the block above and then re-measured rather than shipped.
+The car's fragment chain has **no missing input left**: real geometry, real UVs, eight real textures
+(ids 35–42, the same ids in both runs), `MODULATE(TEXTURE,DIFFUSE)` over a white diffuse, lighting
+on, and the port's combiner predicting the exact near-black the framebuffer holds. It is dark
+because **those textures are dark** (means 13–100) — so "one flat piece of paper" is a dark,
+low-contrast, shape-mangled object, and the mangling lives in the geometry/winding, not the fragment
+chain.
+
+**2. Depth is not what costs the page its own content.** With the car drawn and z forced off for its
+29 draws, the frame is still 96.47 % one colour with **zero** pixels of the menu's LightYellow
+(231,235,198) — the colour r10's car-dropped arm showed at 56,113 px. What DID change is the car
+itself: `(236,236,236)` 1,182 → 5,546 px, `(49,52,49)` 2,162 → 3,573 — with z off the car shows more
+of its own surface, which is what the depth test was cutting. Caveat carried with it: the two runs
+are **not** byte-comparable (183,963 car-rect pixels differ by 1–2 LSB; the whole page is one LSB
+greener in run 2, and that shift is unattributed), so the comparison was made with a tolerance and
+the content statement stands on the LightYellow count, not on an md5 match.
+
+Frame pushed: `frames/opt-preview_20261011-1532_r11_Z-OFF-forced_depth-off_menu-content-still-absent.png`
+(md5 `29e1c6a489554c3bc382255bb0839241`).
+
+**Next, in one line:** the remaining candidate for the hidden menu is a non-depth side effect of the
+3D draw on the TL path — alpha-test state at the TL draws, or the pipeline/descriptor binding the 3D
+batch leaves behind (`pipelines=3 (built=3 hit=152372)` is the counter to read).
+
+---
+
 ## installer + public face (2026-10-11 15:0x–15:2x EEST) — the shipped installer could not have worked, the pair did not compose, and the repo's face was not this game
 
 **The bug, reproduced on his own tree** (isolated `HOME`, nothing written to his
