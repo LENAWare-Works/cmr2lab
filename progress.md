@@ -1444,3 +1444,92 @@ New §12a corrects it, and her own colour report is the discriminator: colour si
 `0x18` in both layouts, so C gives **right paint, destroyed positions**, which is her
 sentence. B survives; A and D are dead on that screen. The separating field (`fixed32` vs
 `fixed48`) is already in `tools/patch_menudraw.py`.
+
+## 0g. THE MENU CAR'S OWN DRAWS, MEASURED ON THE OPTION SCREEN AT LAST — the index base is not it, and the geometry does not move. appended 2026-10-11 09:3x EEST by the `MENU-CAR-FLATTENED` worker (round 3); nothing above this block was touched
+
+> The ticket's own hypothesis, answered on the screen it was written about. Round 1 argued it
+> from ten call sites, §0f (the peer's) from the census. This round put the instrument on the
+> option screen itself: **one run, 10,500 indexed 3D draws of the menu car, every one of them
+> `zeroBase=no idxInRange=yes`.**
+
+**How it was taken.** `work/MENU-CAR-FLATTENED/out-md2/cmr2`, md5 **`cfd9cb7980dff26a5e56649467845432`**
+(the game plus `LENA-MENUDRAW`, built from the current `port/rhi/deck_dd7.cpp` with the RHI's own
+`build32_dd7.sh` recipe; `port/rhi/deck_dd7.o` and `PLAY/out-plain/cmr2` were **not** touched).
+`LENA_MENUDRAW=1 LENA_MENUDRAW_MAX=1500 LENA_MENUDRAW_AT=/tmp/mdnow` — a new **file-triggered
+burst** (`work/MENU-CAR-FLATTENED/patch_mdburst.py`) that fires when a driver touches
+`/tmp/mdnow`, because the old sampling (first N draws of the run) cannot be aimed at a car that
+is a few hundred frames of a 6,000-frame run. Driver `md_drive.py` reached the option camera at
+**t=132.4 s**, then fired **7 bursts** and took 7 captures and touched nothing of the peer's.
+Log: `work/MENU-CAR-FLATTENED/out/md_raw.log` (7.0 MB, 42,007 `[MENUDRAW]` lines).
+Ring timeouts `gfx_0.0.0` before **12**, after **12**.
+
+**1. ABSOLUTE OR RELATIVE — measured, not inferred: relative, all of them.**
+
+| what | value |
+|---|---|
+| indexed 3D draws parsed | **10,500** — `fvf=0x2d2 stride=48` on every one |
+| `zeroBase` | **no × 10,500** — startVert≠0 on every one (7 distinct: 1532, 1648, 1657, 1669, 1685, 1701, 1713) |
+| `idxInRange` | **yes × 10,500** — every index the backend received is inside `[0,numVerts)` |
+| `OUT OF RANGE` lines | **0** |
+| indices as the backend received them | e.g. `idx[0..5]=2,1,0,1,2,3` — part-local, needing `+startVert` |
+
+The ticket's hypothesis needs the menu car to hand **absolute** indices. It does not: it hands
+part-local ones, so the corrected default (`startVert + idx`) reads the vertex the game built,
+and the old `sub` re-base would subtract `startVert` a second time on **every one of these 10,500
+draws**. The menu car uses the **same convention as the race path**, and it is the same
+convention 10,500 times over with zero exceptions. **Item 3 therefore needs no scoping — the
+fix is right for both paths, and this is now a measurement rather than a good argument.**
+
+**2. WHAT MOVED: nothing, between bursts.** Every part's object-space box is **identical in all 7
+bursts** (8-second spacing across a held screen) — 1 distinct box per part over the whole run.
+If the screen's per-frame deform (`OptionPreview_RebuildDeformedGeometry` → `Mesh_Rebuild`) were
+crushing the car, its box would walk or collapse across the bursts. It does not move at all, so
+**candidate B is dead as the explanation of this screen** and the fault is static.
+
+**3. The 7 parts, object space, as the draws read them** (`parts.py`):
+
+| startVert | verts | idx | box (float decode of the bytes the draw read) |
+|---|---|---|---|
+| 1532 | 116 | 156 | x[-80..80] y[42.18..100] z[-80..80] |
+| 1648 | 9 | 24 | **x[-100..100] y[0..0] z[-100..100]** — flat plate at y=0 |
+| 1657 | 4 | 6 | **x[-100..100] y[0..0] z[-100..100]** — flat quad at y=0 |
+| 1669 | 32 | 24 | x[-80..80] y[13.98..79.66] z[-80..80] |
+| 1685 | 16 | 24 | x[-80..80] y[13.98..79.66] z[-80..80] |
+| 1701 | 60 | 36 | x[-80..80] y[0..65.57] z[-80..80] |
+| 1713 | — | — | (same family; see the log) |
+
+`nonfinite=0` on every decode, so this is not a NaN collapse, and the 16.16 re-read of the same
+bytes (`fixed48`) is *not* car-shaped either — the bytes are what a 48-byte float record should
+be. Every part is centred at **x=0, z=0** with y centres in {0, 32.785, 46.82, 71.09}, and two
+of the seven are **exactly flat** (all vertices at y=0). Whether that is a car seen from an angle
+the boxes cannot describe, or a car that was never assembled, is the one thing these numbers do
+**not** settle — see §4.
+
+**4. THE HALF THAT IS STILL MISSING, SAID PLAINLY.** The instrument prints **object space**. It
+cannot tell "the vertices are a car and the transform is wrong" from "the vertices are not a
+car". That is exactly the split the ticket's families A/D vs B/C name, and it needs the
+**device-space** box of the same draws, which `A7VK_GEOTRACE` already computes
+(`a7_vk32.c:1926`, `gt_note_3d`: dmin/dmax in device space, `anyin`/`anyw`/`nvis`, plus the three
+matrices). A run with both instruments on the same screen is **in flight as this is written**
+(`work/MENU-CAR-FLATTENED/wait_sub2.out`) — with `A7VK_IDXBASE=sub` as well, which is the A/B's
+missing half: **the first two attempts at `sub` never reached the option screen** (30 keys, 0
+captures, 0 bursts, `out/md_sub.hunt`), so the A/B is *predicted per draw* by `zeroBase=no` and
+the index arithmetic, and **not yet photographed**. It is not claimed.
+
+**5. THE CAPTURES SHOW THE CAR ABSENT, AND THAT MATCHES §0f.** Seven 1280×800 captures of that
+screen (`work/MENU-CAR-FLATTENED/frames/md_raw.00N.ppm`): 31k–33k distinct colours, but sampled
+over 49,105 px only **0.75 % have a horizontal gradient > 60**, and those sit in the bottom HUD
+band (rows 600–799) and rows 0–199 — **rows 200–599 are edge-free**: a dithered sky/ground
+gradient with no object in it. The owner map on the same frames reads
+**`0/2560 cells owned (0.0 % of the frame) by 0 textures | 0 tris drawn`** *while the instrument
+is printing 7 mesh parts per frame*. Submitted, and covering nothing. One PNG is in `frames/`
+under a name that says what it is.
+
+**6. A CORRECTION TO §0f'S READING OF `owner1.log`, with the numbers.** In `owner1.log` the
+census method counter reads `DrawIndexedPrimitiveVB=9628` at the frame-3600 census and **still
+9628** at the 4800 and 5800 censuses, while the option camera stays up throughout. So the game
+made **zero** indexed 3D draws after ~3600 on that screen: the "9,628 draws put zero triangles"
+line describes a screen where nothing is submitted at all, not 9,628 draws that rasterise
+nothing. (The owner map's own draw column is that same cumulative counter — its "tris" column is
+the per-frame one.) My run is the opposite case and it is the informative one: there the car *is*
+submitted, 7 parts per frame, 10,500 draws, and the frame still has no car in it.
