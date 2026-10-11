@@ -1533,3 +1533,42 @@ line describes a screen where nothing is submitted at all, not 9,628 draws that 
 nothing. (The owner map's own draw column is that same cumulative counter — its "tris" column is
 the per-frame one.) My run is the opposite case and it is the informative one: there the car *is*
 submitted, 7 parts per frame, 10,500 draws, and the frame still has no car in it.
+
+## 0h. THE A/B, ON THE OPTION SCREEN AT LAST — the switch is not inert there, and the old re-base kills the car. appended 2026-10-11 09:5x EEST by the `MENU-CAR-FLATTENED` worker; nothing above was touched
+
+> §0g measured the shipped default on that screen. This is the other half: same binary, same
+> screen, same route, **one env var apart**, `A7VK_IDXBASE=sub` (the pre-fix re-base).
+
+**The A/B pair, both runs on the option camera `eye=(0.14 -0.09 -5.00)`:**
+
+| | shipped default (`out/md_raw.log`) | `A7VK_IDXBASE=sub` (`out/md_sub4.log`) |
+|---|---|---|
+| indexed 3D draws recorded | 10,500 | 22,500 |
+| `zeroBase` | no × 10,500 | no × 22,500 |
+| **`idxInRange`** | **yes × 10,500** | **NO × 22,500** |
+| indices as the backend received them | `2,1,0,1,2,3` | **`64650,64649,64648,64649,64650,64651`** |
+| option-camera coverage of the frame (owner map) | **599 / 591 / 450 cells = 23.4 / 23.1 / 17.6 %** (3 of 16 dumps) | **0/2560 cells in 21 dumps**, at most 28/2560 = **1.1 %** |
+| the captures | 31k distinct colours, dithered sky/ground, no car (`md_raw.00N.ppm`) | **100 % one colour in 14 of 15 captures** (`md_sub4.00N.ppm`) |
+
+**The arithmetic that explains the index column, on the measured draws.** `sub` hands the backend
+`idx[i] - startVert`; with part-local indices (2,1,0) and `startVert=888` the subtraction
+underflows a `uint16` to **64650** — computed for all 10,500 draws of the default run, **100 %
+of them** land outside `[0,numVerts)` and past the end of the 2000-vertex vertex buffer
+(`work/MENU-CAR-FLATTENED/ab_predict.txt`). The run above then did it for real.
+
+**What this settles, in the ticket's own terms:** the index-base switch is **not inert on this
+screen** — every one of the menu car's draws has `startVert != 0`, so the switch reaches all of
+them — and the old re-base is **catastrophically wrong for the menu car**, exactly as it was for
+the race path. The corrected default is right for both, so **no scoping is needed and the fix
+must not be reverted**. Second PNG pushed: `frames/opt-preview-camera_20261011-0948_IDXBASE-sub_FLAT.png`
+(md5 `d8238905f8365730731d52d228077cc6`) — the `sub` screen, one flat colour, for the phone to
+hold next to the default's.
+
+**What it does NOT settle, said plainly: neither half is a picture of a mangled car.** The
+default run's frame has no car *in* it; the `sub` run's frame is empty. The defect the ticket was
+written about — a car that renders as "one flat piece of paper" — is therefore **still
+unexplained**, and §0g's two findings are why: the geometry does not move between bursts, and
+the object-space boxes of the parts the draws read are not car-shaped to begin with. The next
+instrument is named in §0g item 4 and in `work/MENU-CAR-FLATTENED/CHECKPOINT.md` §15: the
+**6,258 mesh draws in the same log that are NOT indexed** (`DrawIndexedPrimitiveVB=45705` vs
+`0x2d2 MESH=51963`) and **`A7VK_GEOTRACE`'s device-space box** for the draw that has one.
