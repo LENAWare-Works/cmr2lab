@@ -1389,3 +1389,43 @@ key burst at the frontend, watched for the camera line, is the cheapest route to
 Kernel ledger offered to the death ticket: no page fault, no `ring gfx_*` timeout and no
 `MODE2 reset` since **07:31:56**; the two today are 07:25:40 (pid 498908) and 07:31:49
 (pid 501251).
+
+## 0f. THE OPTION SCREEN'S TEXT PATH WAS A `ud2`, AND ITS 3D SUBMITS DRAWS THAT RASTERISE NOTHING — appended 2026-10-11 09:1x EEST by the `MENU-CAR-EVIDENCE-VISION` worker (round 2); nothing above this block was touched
+
+Round 1 of this task appended §0e-adjacent material and `docs/MENU-CAR-EVIDENCE.md`. Round 2
+appends §10–§16 to **that same file** and hands the phone
+`docs/NOTE-to-phone-MENU-CAR-EVIDENCE-2.md`. Two findings, both measured:
+
+**1. The option/setup screen's text placement was fatal in every build until 08:53.**
+`OptionMenu_TransformHudPointToScreen` (CMR2 `0x00503b70`, `GameInfo.cpp:6068`) was declared
+`int` and never returned a value, so clang's `ud2` executed on **every** call. Both call
+sites (`RallyData.cpp:7210`, `:7237`) are inside the option menu's label loop and the
+coordinates they write go straight into `OptionMenu_DrawTransitionTextShortCoords(…,
+GetTextString(0xfe), …)`. The last two SIGILL coredumps are **08:40:03, both from
+`work/PLAY/out-plain/cmr2`** — his own play binary. The `int`→`void` fix landed 08:53
+(md5 `d26a09231a98ebb25b6da8b664275f87`). Her photos are timestamped 07:35, i.e. **78 minutes
+before the fix**, so her "no menu text" observation is not a moiré artefact of the photo —
+on that build the screen's text placement could not run without killing the game. It is
+still a *candidate*, not a proof: a local pre-fix capture of a menu screen
+(`out/owner1.02_t68.ppm`) does contain glyph strokes (1-px-wide vertical runs, 17 px tall).
+One run on the current build decides it.
+
+**2. On that same screen the 3D submits 9,628 draws and rasterises ZERO triangles.** From
+`out/owner1.log`'s owner map, camera `eye=(0.14 -0.09 -5.00)` throughout: frame 3200 =
+711/2560 cells / 6,757 draws / **489,067 tris**; frame 3600 = 711/2560 / 9,628 draws /
+**207,801 tris**; frames **4000, 4800, 5800… = 0/2560 cells / 9,628 draws / 0 tris**, `0 tris
+behind eye`. Three 1280×800 captures inside that window (frames 3996/4883/5798) are
+**93.455 % a single flat colour `(140,149,158)` — 956,980 px, to the pixel in all three —
+with no car in the frame at all.** Geometry submitted and rasterising nothing is what
+degenerate geometry looks like, and its near-degenerate form is jagged fragments compressed
+into a small area still wearing the mesh's own paint — which is her picture. That moves the
+lead to the per-frame deform path (`OptionPreview_RebuildDeformedGeometry`,
+`GameInfo.cpp:8147`; `CarDamage_ApplyCameraSpaceMeshDent`, `StageTiming.cpp:5340`;
+`Mesh_Rebuild`, `Mesh.cpp:103`). No bug is claimed in that code from a read — the instrument
+proves it, not a paragraph.
+
+**No GPU run in this round.** Miami held the box both rounds (verified foreign, not assumed:
+`sh gpu-guard.sh --list` → `FOREIGN cmr2 /home/deck/lena/work/PLAY/out-plain/cmr2`). New
+tools: `tools/shard_bbox.py`, `tools/shards.py`, `tools/region_map.py` — read a capture's
+content, per exact colour, without a GUI. `A7VK_IDXBASE` was verified present in the live
+binary after worker 1's 08:53 rebuild, so the phone's discriminating A/B still exists.
