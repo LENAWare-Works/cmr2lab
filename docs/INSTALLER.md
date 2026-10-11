@@ -136,7 +136,7 @@ bare binary.
 | file | what it is | md5 |
 |---|---|---|
 | `cmr2lab` | the content lab + installer CLI, v0.2.2 | `135559b49804f6733b1d808f9f4cd477` |
-| `cmr2install` | the browser installer, v0.2.1 (v0.2.0 + the compat shim and multi-install scan) | `f0f9be8c33fb233bc13a3f9f00471871` |
+| `cmr2install` | the browser installer, v0.2.1 (v0.2.0 + the compat shim and multi-install scan) | `0a68aedac4ad46afd7a54029614870f4` |
 | `tools/build_art.py` | regenerates the public-face art from the game's own FrontEnd bfl | — |
 
 Both tools are one file, stdlib only, no dependencies. `cmr2install` loads `cmr2lab`
@@ -145,10 +145,11 @@ tested as a pair.
 
 ## 7. Who owns it
 
-**The installer stays Lena-on-the-phone's to own; this repo consumes it, pinned.** See
-the note in `docs/ART-PROVENANCE.md`'s sibling message for the reasoning — short version:
-she wrote it, she has the browser/HTTP context it lives in, and a Deck-side lane that
-rewrites a tool it cannot see the users of is how the AMS2 bug happens. What this side
-does own is the **verification**: every claim above, re-measured on this machine, and
-the pairing tests that stop the two files drifting apart again (that drift is §4.1).
-Deck-side fixes go back to her as a diff, not as a fork.
+**The installer stays Lena-on-the-phone's to own; this repo consumes it, pinned.** The
+reasoning, briefly: she wrote it, she has the browser/HTTP context it lives in, and the
+Deck is the place it gets *measured*, not the place it gets rewritten — a side that
+rewrites a tool it cannot see the users of is exactly how the AMS2 false positive
+happened. What this side owns is the **verification**: every claim above was re-measured
+on this machine, plus the pairing tests that stop the two files drifting apart again
+(that drift is §4.1, and it was live in the shipped pair). Deck-side fixes go back to her
+as a diff and a failing case, not as a fork.

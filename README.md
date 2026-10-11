@@ -211,6 +211,24 @@ is recorded in `docs/README-ARCHIVE.md` rather than quietly edited away.)
 
 ---
 
+## The installer (new, 11 October)
+
+Two doors, both one file, no dependencies:
+
+```
+cmr2lab where                 # every place searched, found/miss/skip, then the install
+cmr2lab install --native      # write the launcher; refuses if there is no native port
+python3 cmr2install           # the same thing in a browser, for people who do not want a terminal
+```
+
+The bug that made "the installer" do nothing is fixed and written up with the measurements
+in [`docs/INSTALLER.md`](docs/INSTALLER.md): it used to hand Steam a **folder** to launch.
+It now finds the content directory (`Cars/` **and** `Tracks/`), walks up to the ancestor
+that actually holds an executable, and puts *that* in `Exec=`. On this Deck the search
+finds **two** real installs — a dev copy and a GOG copy inside a Steam Proton prefix — in
+0.17 s, and lists both rather than picking for you. A `--path` you give is a hard stop if
+it is wrong: no silent fallback.
+
 ## Track 2 — "I want to build the native port"
 
 Read [`docs/PORT-PLAN.md`](docs/PORT-PLAN.md) first. It has the measurement method, the
@@ -291,7 +309,8 @@ In rough order, and every item here is a real plan rather than a wish:
 
 | path | what |
 |---|---|
-| `cmr2lab` | the container tool — one file, no dependencies |
+| `cmr2lab` | the container tool **and the installer CLI** — one file, no dependencies (`where`, `install`) |
+| `cmr2install` | the **browser installer** — three tiers: the usual places, an automatic search under them, then a real folder browser. Needs `cmr2lab` beside it |
 | `src/port/` | the native renderer: C + SDL3 + Vulkan |
 | `docs/DXT-COPY-PATH.md` | why the stage's textures were invisible (fix 1) |
 | `docs/GPU-LIFETIME-FIX.md` | the ring timeout that killed every run (fix 2) |
@@ -307,6 +326,9 @@ In rough order, and every item here is a real plan rather than a wish:
 | `docs/GLOSSARY.md` | **every term in this repo, in plain English** |
 | `docs/progress-archive.md` | the dated append-log, mistakes included, kept verbatim |
 | `tools/` | the analysis scripts behind the numbers |
+| `tools/build_art.py` | regenerates the public-face art from the game's own FrontEnd textures — nothing drawn by hand |
+| `docs/INSTALLER.md` | what the installer got wrong, what is verified now, and the one defect found in the pair |
+| `docs/ART-PROVENANCE.md` | the old social preview measured, the new one measured, and an audit of which palette entries really come from the game |
 | `tools/fixes/` | the five fixes, as runnable patch scripts |
 | `progress.md` | the live status page — rewritten whole each round |
 

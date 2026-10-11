@@ -768,3 +768,58 @@ texture, or the wrong one), (ii) the texture-stage 0 combine (the census logs
 `MENUDRAW` — the two bound texture handles and the material diffuse of the car's own draws, plus
 an arm that forces texturing off — separates them, and it needs no new run machinery: the same
 `md_skip3b` route, the same trigger file.
+
+---
+
+## installer + public face (2026-10-11 15:0x–15:2x EEST) — the shipped installer could not have worked, the pair did not compose, and the repo's face was not this game
+
+**The bug, reproduced on his own tree** (isolated `HOME`, nothing written to his
+applications): `find_game('…/.lena_cmr2/game')` → `…/game/Game`, which holds `Bigfiles
+Cars Tracks DemoRuns Info` and no executable, so the launcher carried
+`Exec=…/game/Game` — a **directory**. v0.2.0's root-vs-content split fixes it:
+root `…/.lena_cmr2/game`, content `…/game/Game` (220 cars, 212 tracks), exe `CMR2.exe`.
+
+**Four defects in v0.2.0 were already measured and fixed here** (`work/CMR2LAB-v020/REPORT.md`,
+v0.2.2, md5 `135559b49804f6733b1d808f9f4cd477`): the `Cars/ + Tracks/` test badged
+**Automobilista 2's audio folder** as `✓ <== INSTALL` (0 cars, 0 tracks, exit 0);
+`~/.lena_cmr2` is a dead path on this box; a failing `--path` still fell back; and the
+bounded walk could not reach a Proton prefix, which — once fixed — found **a second real
+install**: his GOG copy at `compatdata/3646996028/pfx/drive_c/Program Files (x86)/Codemasters/Colin McRae Rally 2`, 220/212. Whole search: 0.17 s. v0.2.2 re-verified here:
+no-arg `where` now picks the dev copy, AMS2 is refused *with the reason*, a nonexistent
+`--path` hard-stops, `--all` lists both installs.
+
+**The defect I found in the pair (fixed in this commit).** `cmr2install` unpacked
+`lab.locate()` as a 2-tuple; v0.2.2 returns 4 → `/api/scan` raised
+`ValueError: too many values to unpack` inside the request handler, so **tier 1/2 of the
+browser installer returned an empty reply**. Fixed with a shape-tolerant `_locate()` that
+accepts both versions, and used `everything=True` so tier 1 now lists **both** installs
+instead of AMS2. Re-verified with the old lab and the new one.
+
+**The browser installer, verified independently through HTTP** (not the CLI), on
+fixtures: A auto → Wine/GOG prefix → `Exec=…/CMR2.exe` `exists:true runnable:true`;
+B `--native` where a port exists → `cmr2-native`; C `--native` with no port → refuses,
+**no file written**; D nonexistent folder → refuses with the reason, **no file written**.
+4/4, and `ls` of the output dir afterwards shows exactly `A.desktop` and `B.desktop`.
+
+**The public face.** The old `docs/social-preview.png` (`e692c642…`) measures **0 gold**
+pixels and, under the rule `r≥95, g≤65, b≤65`, exactly **5,666** "red" — the phone's
+number, reproduced; exact `#8b0000` is **9**. Its palette is 50,520 shades of generic dark
+UI. Replaced with art regenerated from the game's own `FrontEnd/res1024.bfl`: **19,838**
+gold and **231,183** red at 1280×640, wordmark band 19.97:1 against its plate and 19.77:1
+measured **on the 128 px icon**, i.e. still legible where the old art had nothing to read.
+Old file kept at `docs/art/old-social-preview-e692c642.png`. **The GitHub social-preview
+upload is web-UI only** — the file is in place, the setting needs a human at a browser.
+
+**And one honest correction to the art's own provenance:** `build_art.py` says every
+colour is "sampled from the game files". Audited against all 72 textures: red `#8b0000`
+(6,953 px), dirt `#744032` (5,342 px) and sky `#dae8ec` (6,020 px) are real; `#fff300` gold
+appears **0 times** (the game's gold is `#fff100`, 2,641 px in `bgre.tga`) and bone
+`#dcd3b1` appears **0 times** anywhere. The art is fine; the claim is two entries short of
+true. `docs/ART-PROVENANCE.md` has the table and the two ways to settle it.
+
+**§1 was also corrected**: it still named `80d927…` (11:02) as "RIGHT NOW" while the play
+binary has been **`9ecbf87bb8650a3883b188f4e77890e4`** since **12:04:43** — the question the
+phone opened with.
+
+New in the repo: `cmr2install` (v0.2.1, md5 `0a68aedac4ad46afd7a54029614870f4`), `cmr2lab`
+v0.2.2, `tools/build_art.py`, `docs/art/`, `docs/INSTALLER.md`, `docs/ART-PROVENANCE.md`.
