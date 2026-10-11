@@ -578,3 +578,75 @@ own vertex normal** (offset 12 of the same 48-byte vertex). A mesh whose outward
 screen-CCW is wound the other way round from the port's global rule — which draws a car
 inside-out, and "inside-out" is what "all mangled and jungled up into one flat piece of paper"
 describes. No picture and no second run needed.
+
+---
+
+## setup-menu car r9 (2026-10-11 14:2x–14:4x EEST): the frame measured against the port's OWN rasteriser of its own draws — the car page's cells are 70–78 % background, in either y orientation
+
+`work/MENU-CAR-FLATTENED/ROUND9-ENGINE-VS-SCREEN.md`, `cmp9.py`, `fit9.py`, `flip9.py`, `map9.py`.
+No GPU run this round (the card was a peer's for the whole round: `work/RACE/out-rt10/cmr2`,
+guard-verified) and no render-path code was changed.
+
+`[OWNER]` is the RHI's own CPU-side rasteriser of the same triangles the draws submit, loaded with
+the same 48-byte stride and multiplied by `b->mvp` — **the very block that goes to the GPU**
+(`a7_vk32.c:2637` hands `&b->blk` to `ow_note`, and `b->blk.mvp` is what `a7vk_fill_block` negates
+and memcpy's at `:2735`). Nobody had compared that prediction against a capture of the same frame.
+This round did, cell by cell, at the owner map's own 20 px grid.
+
+**What the engine says it drew on this page:** frames 3650…4000 of `md_proj9b` all report **438 of
+2560 cells owned, 2747 triangles**, by 8 textures — `tex=36` 255 cells (the body), `tex=37` 89 cells
+in two wheel-shaped blobs, `tex=38` 75 cells (the cabin), `tex=40` 19 cells. Rows 14–27, cols 7–52
+= **x 140–1050, y 280–560 px**. It is a car, it is static, and it is what the port thinks it drew.
+
+**What the frame shows, 8 frames of the same run:**
+
+| `[OWNER]` frame | capture | engine cells | screen cells | both | engine-only | screen-only |
+|---|---|---|---|---|---|---|
+| 3650 | 3649 | 438 | 217 | 130 | **308** | 87 |
+| 3700 / 3750 | 3699 / 3749 | 438 | 168 | 97 | **341** | 71 |
+| 3800 / 3850 | 3799 / 3849 | 438 | 217 | 130 | **308** | 87 |
+| 3900 / 3950 | 3899 / 3949 | 438 | 168 | 97 | **341** | 71 |
+| 4000 | 3999 | 438 | 217 | 130 | **308** | 87 |
+
+**70–78 % of the car's own cells are plain background colour on the frame**, and 40 % of the
+screen's own non-background cells lie *outside* the car's footprint. It is not an orientation
+error — the `[OWNER]` map's own y convention is ambiguous by construction (it maps ndc y=+1 to row
+0 while the block it reads has had the y column negated for Vulkan), so **both** orientations were
+tested: IoU **0.248** as printed, **0.287** flipped vertically, and **0.435** for the best of 4,000
+scale × flip × offset candidates (a 2:1 shrink *and* a 180° rotation — the fit finding chrome, not
+a viewport transform).
+
+**Round 7's positive is retired on its own frames.** The PNG it shipped as "the cull arm shows the
+car" (`frames/opt-preview-car_20261011-1346_CULL-OFF_car-visible.png`, md5 `4fe6c651bdc26e45d8e8e9d0811a0c0b`)
+is byte-identical, at every sampled byte, to `md_mc_none_r1.043…046` — capture frames **4464, 4471,
+4488, 4490**, four consecutive captures of one unchanging image — and against that run's own
+`[OWNER]` car map it scores IoU **0.310** upright / **0.338** flipped. The arm that forces
+`D3DCULL_NONE` on every indexed 3D draw of the car page does not put the engine's car on the screen
+either.
+
+**And the `853x533` that `MENUPROJ` prints is identified:** it is the frontend **render target's**
+size (`DeckD3D7::CreateDevice`, `deck_dd7.cpp:1274-1284`, stores `d->viewport` = the render target
+size; `[WIN]`/`[A7VK]` say the display and swapchain are 1280x800). The game does call
+`SetViewport` (1200 times in 600 frames; `Game.cpp:2667` with a caller rect, `Game.cpp:2774` with
+`(0,0,resX,resY)`, `Graphics.cpp:2995` for the shadow cube faces) — **and the port stores every one
+of them and applies none**: `a7vk_record` sets the Vulkan viewport, the scissor and the shader's
+own pixel mapping `pc.vp = (W/2, H/2)` from the **swapchain extent**, once per frame
+(`a7_vk32.c:2782-2795`, `:2847`). Not the flat-car cause (it mis-scales, it does not flatten), but
+a named port defect on exactly this page, and it is the reason the `[OWNER]` map *is* a fair
+prediction of the frame.
+
+**What did not move: no coherent car has been seen and none is claimed.** The question the round
+sharpens: the port's own rasteriser of the port's own draws puts a car on 438 cells, and the GPU's
+frame does not show it — in either y orientation, with culling forced off, and with alpha test and
+blending forced off (checkpoint §44). Either the car page these runs reach is **not** the sub-page
+Miami is looking at (a fork open since round 5, never closed), or the car's batches are dropped or
+overwritten between the batch and the rasteriser in a way independent of every state the draws
+carry. The next instrument is unchanged and still unbuilt: the normal-vs-winding test (vertex
+normal at offset 12 vs screen-space winding, in `MENUPROJ`'s own hook), a submit-time cull readout,
+and the `A7VK_SNAP` four-consecutive-frame fence.
+
+Frames pushed with this block: `frames/opt-preview-car_20261011-1440_f3639_ENGINE-SAYS-438-cells.png`
+(md5 `9b9f142d9b002852f442a138f622d427`) and
+`frames/opt-preview-car_20261011-1440_f3639_CAR-REGION-2x.png` (md5 `24e329061cd9f34fd21005de841e0a3c`),
+both from `md_proj9b` capture 002 = frame 3639, the frame whose engine prediction is the first row
+of the table above. `git push origin HEAD` still fails (no credential helper on this box).
