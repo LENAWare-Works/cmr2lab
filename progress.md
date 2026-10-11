@@ -537,3 +537,44 @@ that DID progress earlier today must therefore have been taking input from
 *somewhere else* — another lane's injector — which is the same contamination
 `work/DEMO-DRIVE-CRASH` reported at 12:02 from the other side. Anything measured
 on this box through a scripted route carries that caveat, this round included.
+
+### the setup-menu car, round 8 — the same-run cull A/B was run, and it comes back NEGATIVE
+
+Round 7 ended with a lead and a promise: forcing `D3DCULL_NONE` around the option page's indexed
+3D draws had put content into the car's own cells, so culling looked like the mechanism — but
+the two arms were two *runs*, so the page could have differed. This round ran the same-run,
+adjacent-frame version of it (a new env-gated instrument, `LENA_MENUCULL_PHASE=<frames>`, which
+alternates the forced cull between `D3DCULL_NONE` and the game's own value every N frames and
+logs every change with the frame number, so each capture carries its own arm from the port's
+own log).
+
+**On one page, in one process, 204 captures inside the 3D window, 102 under each arm: the two
+arms are indistinguishable.** Mean car-cell content 11.65 % (NONE) vs 11.64 % (PASS); median
+3,003 distinct colours both ways; and the cleanest case is exact — frame 3639 (`PASS`) and frame
+3641 (`NONE`) are **the same 1,024,000 pixels**, md5 `f4eda0d799ecf08e94cf51efce221563`, both
+pushed to `frames/opt-preview-car_20261011-1420_*`. **Culling is not what hides the car on this
+page**, and round 7's lead is downgraded from "the mechanism" to "a variable that changes
+nothing here". Two caveats, both measured and both in `work/MENU-CAR-FLATTENED/ROUND8-CULL-AB.md`:
+the game presents each rendered frame twice, so a capture can repeat a frame rather than redraw
+it; and the `[GEO]` state snapshot restores the game's cull after every draw, so it cannot
+confirm the forced arm reached the pipeline — a submit-time state readout is the follow-up.
+
+**What the tracing DID settle about the car, on the page itself** (`LENA_MENUPROJ`, 3,000 traced
+draws, every one logged): the game asks for `D3DCULL_CCW` on the preview car itself
+(`gameCull=0x3` on every line — it is the game's own state, not the port's); the transform is
+never mirrored or degenerate (`det_raw = +3.19935`, `det_flip = −3.19935`, identical on all
+3,000; 0 vertices behind the camera, 0 non-finite); and over the 3D window's **96,655 triangles,
+40.7 % are wound the way `D3DCULL_CCW` KEEPS and 59.3 % the way it CULLS, with none degenerate**
+— which is what a closed mesh looks like from outside, and which therefore also kills the strong
+form of "the car is culled to nothing". The index-base fix is not re-based differently here than
+on the race path, so it is not this bug either — re-confirmed on the page the ticket was written
+about, not just at the call sites. **No render-path code was changed this round**: the binary
+differs from the shipped one only by two env-gated instruments, so nothing can have been
+re-broken, and the race path was not touched.
+
+The one instrument this page still needs is specced in the same file and is arithmetic on bytes
+the port already reads: compare each triangle's **screen-space winding with the direction of its
+own vertex normal** (offset 12 of the same 48-byte vertex). A mesh whose outward faces come back
+screen-CCW is wound the other way round from the port's global rule — which draws a car
+inside-out, and "inside-out" is what "all mangled and jungled up into one flat piece of paper"
+describes. No picture and no second run needed.
