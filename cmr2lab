@@ -2,24 +2,65 @@
 """
 cmr2lab — one file. Colin McRae Rally 2.0 content laboratory.
 
-    cmr2lab status                what is here, what is possible
-    cmr2lab list [cars|tracks]    enumerate content
-    cmr2lab unpack  <in.bfl> <dir>
-    cmr2lab pack    <dir> <out.bfl>
-    cmr2lab info    <in.bfl>      entries + magic breakdown
-    cmr2lab repack  <dir>         unpack -> rebuild -> VERIFY byte-identical, per file
-    cmr2lab install               write a Steam non-Steam-game launcher
-    cmr2lab tabs                  show the CMR2 / CMR3 content tabs
+    cmr2lab where [--path DIR]     find the game; show EVERY place searched
+    cmr2lab where --all             every install on the machine, and how they differ
+    cmr2lab status [--path DIR]    what is here, what is possible
+    cmr2lab install [options]      write a launcher (Steam / desktop)
+    cmr2lab list [cars|tracks]
+    cmr2lab unpack <in.bfl> <dir>
+    cmr2lab pack   <dir> <out.bfl>
+    cmr2lab info   <in.bfl>
+    cmr2lab repack <dir>
+    cmr2lab tabs
+
+finding the game (highest priority first):
+    --path DIR      use this install explicitly
+    $CMR2_DIR       same thing, from the environment
+    cwd + 3 parents
+    our dev copy (~/.lena_cmr2/game, ~/.lena_cmr2)
+    every Steam library, its steamapps/common, and every Proton prefix
+    Heroic > Lutris > Bottles > Wine prefixes > PlayOnLinux > removable/disc
+
+install options:
+    --path DIR      use this install explicitly (highest priority)
+    --exe PATH      launch THIS, whatever it is (binary, script, wrapper)
+    --native        launch the native port binary if one is present
+    --retail        launch the original CMR2.exe (default if no port)
+    --name NAME     what the launcher is called (default: Colin McRae Rally 2.0)
+    --dry-run       print the launcher file, write nothing
+    --out FILE      write the launcher somewhere else
+
+Content is a directory holding Cars/ AND Tracks/ AND at least one .bfl inside
+Cars/ — the .bfl test is what stops an unrelated game's audio bank folder from
+being badged as an install. The install ROOT is the nearest ancestor of the
+content that actually holds an executable; that is what Path= should be.
 
 No dependencies. Python 3 stdlib only.
 """
-import sys, os, gzip, struct, json, hashlib, shutil, subprocess, textwrap
+import sys, os, gzip, struct, textwrap
 
-VERSION = "0.1.0"
+VERSION = "0.2.2"
 MAGIC   = b'CMPR'
 PPF     = b'PP_F'
 TABS    = {"cmr2": "Colin McRae Rally 2.0 — original content",
            "cmr3": "Colin McRae Rally 3 — imported content (separate tab)"}
+
+# An install root is the directory holding the executable.
+# The content lives in a subdirectory (normally Game/) that holds Cars/ plus Tracks/.
+EXE_NAMES = ('cm2.exe', 'cmr2.exe', 'cm2', 'cmr2')
+NATIVE_NAMES = ('cmr2-native', 'cmr2-linux', 'cmr2lab-native', 'cmr2')
+# nothing under here is ever the install root — keeps the search bounded and fast
+SKIP_DIRS = {'sounds', 'frontend', 'setuprep', 'countryspecific', 'videos',
+             'bigfiles', 'cars', 'tracks', 'node_modules', '.git'}
+# inside a Proton prefix we must walk further, but never into Windows itself
+PREFIX_SKIP = SKIP_DIRS | {'windows', 'windows.old', 'programdata', 'users',
+                           'temp', 'appdata', 'local settings', '$recycle.bin',
+                           'microsoft', 'common files', 'system32', 'syswow64',
+                           'intel', 'nvidia', 'amd', 'drivers', 'installer'}
+# on this machine the port is built in the work tree, not in the game folder;
+# offered as a HINT only, never applied behind your back
+HINT_DOORS = ('~/lena/cmr2lre.sh',        # drive-checked picker (preferred)
+              '~/lena/cmr2-native.sh')
 
 # ---------------------------------------------------------------- container ---
 def load(p):
@@ -45,12 +86,12 @@ def build(entries):
     """entries [(name,bytes)] -> raw container. 4-byte aligned throughout."""
     data, toc = bytearray(), bytearray()
     for name, content in entries:
-        while len(data) % 4: data.append(0)          # align each entry
+        while len(data) % 4: data.append(0)
         off = len(data); data += content
         nb = name.encode('ascii')
         toc += struct.pack('<III', len(content), off, len(nb)); toc += nb
         toc += b'\0' * ((4 - len(nb)%4) % 4)
-    while len(data) % 4: data.append(0)              # align the TOC start
+    while len(data) % 4: data.append(0)
     D = len(data); L = 8 + D + len(toc) + 4
     out = bytearray(MAGIC + struct.pack('<I', L-8)); out += data; out += toc
     out += struct.pack('<I', D)
@@ -71,42 +112,320 @@ def kind(name, data):
     if name.lower().endswith('.dds'): return 'texture'
     return 'data'
 
+# ------------------------------------------------------------ find the game ---
+def steam_libraries():
+    """every Steam library path Steam knows about, not just the default one"""
+    out, seen = [], set()
+    homes = [os.path.expanduser('~/.steam/steam'),
+             os.path.expanduser('~/.local/share/Steam'),
+             os.path.expanduser('~/.steam/root'),
+             os.path.expanduser('~/.steam/debian-installation'),
+             os.path.expanduser('~/.var/app/com.valvesoftware.Steam/data/Steam')]
+    for h in homes:
+        rp = os.path.realpath(h)          # ~/.steam/steam, ~/.steam/root and
+        if rp not in seen and os.path.isdir(h):   # ~/.local/share/Steam are one dir
+            seen.add(rp); out.append(h)
+        vdf = os.path.join(h, 'config', 'libraryfolders.vdf')
+        if not os.path.isfile(vdf): continue
+        try: txt = open(vdf, encoding='utf-8', errors='replace').read()
+        except OSError: continue
+        marker, i = '"path"', 0
+        while True:
+            i = txt.find(marker, i)
+            if i < 0: break
+            i = txt.find('"', i + len(marker)); a = i + 1
+            b = txt.find('"', a)
+            if a > 0 and b > a:
+                p = txt[a:b].replace('\\\\', '/').replace('\\', '/')
+                if p and p not in seen:
+                    seen.add(p); out.append(p)
+    return out
+
+def search_roots(extra_path=None):
+    """[(label, path, kind)] — the ordered list of places we look.
+    kind 'content'  = inspect this directory (and 3 levels under it)
+    kind 'prefixes' = a steamapps/compatdata tree: expand to each pfx/drive_c,
+                      where a Steam/GOG copy under Proton actually lives"""
+    H = os.path.expanduser
+    out = []
+    if extra_path: out.append(('--path (you gave it)', extra_path, 'content'))
+    if os.environ.get('CMR2_DIR'): out.append(('$CMR2_DIR', os.environ['CMR2_DIR'], 'content'))
+    out.append(('current directory', os.getcwd(), 'content'))
+    p = os.getcwd()
+    for _ in range(3):
+        p = os.path.dirname(p)
+        if p and p != '/': out.append(('parent of cwd', p, 'content'))
+    # our own working copy. On the Deck it lives under ~/lena; in the sandbox
+    # it is ~/.lena_cmr2. Both are named, and `where` says which one answered.
+    out.append(('our dev copy', H('~/lena/.lena_cmr2/game'), 'content'))
+    out.append(('our dev copy (root)', H('~/lena/.lena_cmr2'), 'content'))
+    out.append(('our dev copy (sandbox)', H('~/.lena_cmr2/game'), 'content'))
+    for lib in steam_libraries():
+        out.append(('Steam library', lib, 'content'))
+        out.append(('Steam common', os.path.join(lib, 'steamapps', 'common'), 'content'))
+        out.append(('Steam compatdata (Proton)',
+                    os.path.join(lib, 'steamapps', 'compatdata'), 'prefixes'))
+    out.append(('Heroic', H('~/Games/Heroic'), 'content'))
+    out.append(('Lutris', H('~/Games'), 'content'))
+    out.append(('Lutris (data)', H('~/.local/share/lutris/games'), 'content'))
+    out.append(('Bottles', H('~/.var/app/com.usebottles.bottles/data/bottles/bottles'), 'content'))
+    out.append(('Wine prefix', H('~/.wine/drive_c'), 'content'))
+    out.append(('Wine prefix (local)', H('~/.local/share/wineprefixes'), 'content'))
+    out.append(('PlayOnLinux', H('~/.PlayOnLinux/wineprefix'), 'content'))
+    for m in ('/run/media/' + os.environ.get('USER', 'deck'), '/media', '/mnt'):
+        out.append(('removable / disc mount', m, 'content'))
+    out.append(('Disc drive', '/dev/sr0', 'content'))
+    return out
+
+def _walk(base, maxdepth, prune):
+    """bounded walk: never descends past maxdepth, never enters prune"""
+    base = base.rstrip(os.sep) or os.sep
+    for root, dirs, files in os.walk(base):
+        depth = root[len(base):].count(os.sep)
+        if depth >= maxdepth:
+            dirs[:] = []
+            continue
+        yield root, dirs
+        dirs[:] = [x for x in dirs if x.lower() not in prune and not x.startswith('.')]
+
+def _bfls(d):
+    try: return [f for f in os.listdir(d) if f.lower().endswith('.bfl')]
+    except OSError: return []
+
+def content_in(d, maxdepth=3, prune=None):
+    """-> (content_dir|None, note)
+
+    A directory holding Cars/ and Tracks/ is NOT enough on its own: on the real
+    machine the audio bank folder of an unrelated racing game holds exactly those
+    two names and zero containers. Real CMR2 content always has .bfl files in
+    Cars/, so that is the test, and a near-miss is reported instead of swallowed."""
+    prune = SKIP_DIRS if prune is None else prune
+    if not d or not os.path.isdir(d): return None, 'does not exist'
+    near = None
+    for root, dirs in _walk(d, maxdepth, prune):
+        if 'Cars' in dirs and 'Tracks' in dirs:
+            if _bfls(os.path.join(root, 'Cars')):
+                return root, 'found'
+            if near is None: near = root
+    if near:
+        return None, 'Cars/ + Tracks/ with no .bfl in it (%s) — not this game' % near
+    return None, 'no Cars/ + Tracks/ here'
+
+def find_data(d, maxdepth=3):
+    """the directory holding CMR2 content under d, or None"""
+    return content_in(d, maxdepth)[0]
+
+def prefix_dirs(compatdata):
+    """[<library>/steamapps/compatdata/<appid>/pfx/drive_c, ...]"""
+    out = []
+    try: appids = sorted(os.listdir(compatdata))
+    except OSError: return out
+    for a in appids:
+        dc = os.path.join(compatdata, a, 'pfx', 'drive_c')
+        if os.path.isdir(dc): out.append(dc)
+    return out
+
+def _exe_in(d):
+    """(native_exe, retail_exe) found directly inside d"""
+    if not d or not os.path.isdir(d): return (None, None)
+    try: low = {f.lower(): f for f in os.listdir(d)}
+    except OSError: return (None, None)
+    nat = ret = None
+    for n in NATIVE_NAMES:
+        if n in low: nat = os.path.join(d, low[n]); break
+    for n in EXE_NAMES:
+        if n in low: ret = os.path.join(d, low[n]); break
+    if nat and ret and nat == ret: ret = None          # one file, one meaning
+    return (nat, ret)
+
+def classify_data(data):
+    """content dir -> {root, data, native, retail}. The install ROOT is the
+    nearest ancestor that actually holds an executable; if none does, the
+    content is still usable for lab work, and that is said out loud."""
+    root, nat, ret = data, None, None
+    probe = data
+    for _ in range(3):
+        n, r = _exe_in(probe)
+        if n or r:
+            root, nat, ret = probe, n, r
+            break
+        parent = os.path.dirname(probe.rstrip(os.sep))
+        if not parent or parent == probe or parent == '/': break
+        probe = parent
+    if not (nat or ret):
+        root = os.path.dirname(data.rstrip(os.sep)) if os.path.basename(data).lower() == 'game' else data
+    return {'root': root, 'data': data, 'native': nat, 'retail': ret}
+
+def classify(d):
+    """If d is a CMR2 install, return root/data/exe info. Else None."""
+    data = find_data(d)
+    return classify_data(data) if data else None
+
+def locate(extra_path=None, everything=False):
+    """-> (info|None, log, hard_fail, found)
+
+    found is every install the search turned up, in priority order, so `where --all`
+    can show that you have more than one and how they differ. When everything is
+    False we stop at the first, which is what every other command wants.
+
+    If you name a --path and it is not usable, that is a hard stop: the reason is
+    returned in hard_fail and nothing else is offered as if it were your install."""
+    log, found = [], []
+    def keep(label, path, info):
+        # one install reported once, however many routes reached it
+        if os.path.realpath(info['root']) in [os.path.realpath(f[2]['root']) for f in found]:
+            return not everything
+        found.append((label, path, info))
+        return not everything
+    for label, path, kind in search_roots(extra_path):
+        if not path or not os.path.exists(path):
+            log.append(('skip', label, path, 'does not exist'))
+            if label.startswith('--path'):        # yours, so it wins -- even as a stop
+                return None, log, 'that directory does not exist', found
+            continue
+        if not os.path.isdir(path):
+            log.append(('skip', label, path, 'not a directory'))
+            if label.startswith('--path'):
+                return None, log, 'that path is not a directory', found
+            continue
+        if kind == 'prefixes':
+            pfs = prefix_dirs(path)
+            if not pfs:
+                log.append(('skip', label, path, 'no pfx/drive_c prefixes here')); continue
+            hit = None
+            for dc in pfs:
+                data, _ = content_in(dc, maxdepth=5, prune=PREFIX_SKIP)
+                if data: hit = (dc, data); break
+            if hit:
+                info = classify_data(hit[1])
+                log.append(('found', label, hit[0], info))
+                if keep(label, hit[0], info): return info, log, None, found
+                continue
+            log.append(('miss', label, path,
+                        '%d Proton prefixes searched, no Cars/ + Tracks/' % len(pfs)))
+            continue
+        data, note = content_in(path)
+        if data:
+            info = classify_data(data)
+            log.append(('found', label, path, info))
+            if keep(label, path, info): return info, log, None, found
+            continue
+        log.append(('miss', label, path, note))
+        if label.startswith('--path'):
+            return None, log, note, found
+    return (found[0][2] if found else None), log, None, found
+
+def counts(data):
+    cars = tracks = 0
+    c = os.path.join(data, 'Cars')
+    if os.path.isdir(c):
+        cars = len(_bfls(c))
+    t = os.path.join(data, 'Tracks')
+    if os.path.isdir(t):
+        for r, d, fs in os.walk(t):
+            tracks += len([f for f in fs if f.lower().endswith('.bfl')])
+    return cars, tracks
+
 # ----------------------------------------------------------------- commands ---
-def find_game(start=None):
-    """-> the directory that contains Cars/ and Tracks/"""
-    cands = [start, os.getcwd(), '/root/.lena_cmr2/game',
-             os.path.expanduser('~/.steam/steam/steamapps/common/Colin McRae Rally 2.0'),
-             os.path.expanduser('~/.local/share/Steam/steamapps/common/Colin McRae Rally 2.0')]
-    for base in cands:
-        if not base or not os.path.isdir(base): continue
-        if os.path.isdir(os.path.join(base,'Cars')) and os.path.isdir(os.path.join(base,'Tracks')):
-            return base
-        for root, dirs, files in os.walk(base):
-            if 'Cars' in dirs and 'Tracks' in dirs: return root
-            if root.count(os.sep) - base.count(os.sep) > 3: dirs[:] = []
+def arg_path(a):
+    """pull --path/-p out of an argument list, wherever it sits"""
+    out = None
+    i = 0
+    while i < len(a):
+        if a[i] in ('--path', '-p') and i+1 < len(a): out = a[i+1]; i += 2; continue
+        if a[i].startswith('--path='): out = a[i].split('=',1)[1]; i += 1; continue
+        i += 1
+    return out
+
+def flag_value(a, name):
+    """value of --name VALUE or --name=VALUE, or None"""
+    for i, x in enumerate(a):
+        if x == name and i+1 < len(a): return a[i+1]
+        if x.startswith(name + '='): return x.split('=',1)[1]
     return None
 
-def cmd_status(a):
-    g = find_game(a[0] if a else None)
-    print(f"cmr2lab {VERSION}")
-    if not g:
-        print("  game: NOT FOUND — pass a path:  cmr2lab status /path/to/Colin McRae Rally 2.0")
+def positional(a, flags_with_value=('--path','-p','--exe','--name','--out')):
+    """arguments that are not flags, and not the value of a flag"""
+    out, i = [], 0
+    while i < len(a):
+        if a[i] in flags_with_value: i += 2; continue
+        if a[i].startswith('-'): i += 1; continue
+        out.append(a[i]); i += 1
+    return out
+
+def _print_log(log):
+    for st, label, path, extra in log:
+        mark = {'found':'✓','miss':'·','skip':'✕'}[st]
+        note = '   <== INSTALL' if st == 'found' else '   (' + extra + ')'
+        print(f" {mark} {label:<26} {path}{note}")
+
+def cmd_where(a):
+    every = '--all' in a
+    info, log, fail, found = locate(arg_path(a), everything=every)
+    _print_log(log)
+    print()
+    if fail:
+        print("you pointed me at a path and it is not a CMR2 install — stopping.")
+        print("  reason: " + fail)
+        elsewhere, _, _, _ = locate(None)
+        print("  not falling back silently."
+              + ("  (with no --path I would have found: %s)" % elsewhere['root']
+                 if elsewhere else "  (and nothing else turned up either.)"))
         return 1
-    cars   = [f for f in os.listdir(os.path.join(g,'Cars'))   if f.lower().endswith('.bfl')] if os.path.isdir(os.path.join(g,'Cars')) else []
-    tracks = []
-    if os.path.isdir(os.path.join(g,'Tracks')):
-        for r,d,fs in os.walk(os.path.join(g,'Tracks')):
-            tracks += [f for f in fs if f.lower().endswith('.bfl')]
-    print(f"  game:   {g}")
-    print(f"  cars:   {len(cars)} containers")
-    print(f"  tracks: {len(tracks)} containers")
+    if not info:
+        print("nothing found.  give it the path yourself:")
+        print("   cmr2lab where --path /path/to/Colin McRae Rally 2.0")
+        return 1
+    if every:
+        print(f"  {len(found)} install(s) on this machine, in the order I would pick them:")
+        print()
+        for i, (label, path, fi) in enumerate(found):
+            c, t = counts(fi['data'])
+            tags = [label]
+            if fi['native']: tags.append('native port')
+            if fi['retail']: tags.append('retail exe')
+            print(f"  [{i}] {fi['root']}")
+            print(f"      {c} cars, {t} tracks   from: {label}")
+            for w in launch_warnings(fi['retail'] or fi['native']):
+                print(f"      launch note: {w}")
+        if found:
+            print(f"\n  default (no --path) would be [0];  pick another with "
+                  f"--path '<the one you want>'")
+        return 0
+    c, t = counts(info['data'])
+    print(f"  install root : {info['root']}")
+    print(f"  content dir  : {info['data']}   ({c} cars, {t} tracks)")
+    print(f"  retail exe   : {info['retail'] or '— not present —'}")
+    print(f"  native port  : {info['native'] or '— not present —'}")
+    for w in launch_warnings(info['retail'] or info['native']):
+        print(f"  launch note  : {w}")
+    if not (info['retail'] or info['native']):
+        print("  launch note  : nothing here can be launched — lab work only")
+    return 0
+
+def cmd_status(a):
+    info, _, fail, _f = locate(arg_path(a))
+    print(f"cmr2lab {VERSION}")
+    if fail:
+        print("  game: the --path you gave is not a CMR2 install — " + fail)
+        return 1
+    if not info:
+        print("  game: NOT FOUND — pass a path:  cmr2lab where --path /path/to/game")
+        return 1
+    c, t = counts(info['data'])
+    print(f"  root:   {info['root']}")
+    print(f"  data:   {info['data']}")
+    print(f"  cars:   {c} containers")
+    print(f"  tracks: {t} containers")
     print(f"  tabs:   {', '.join(TABS)}")
-    print(f"  cmr3:   {'installed' if os.path.exists(os.path.join(g,'cmr3')) else 'not imported'}")
-    print(f"  engine: {'native port present' if os.path.exists(os.path.join(g,'cmr2-native')) else 'original executable'}")
+    print(f"  cmr3:   {'installed' if os.path.exists(os.path.join(info['root'],'cmr3')) else 'not imported'}")
+    print(f"  engine: {'native port present' if info['native'] else 'original executable'}")
+    for w in launch_warnings(info['retail'] or info['native']):
+        print(f"  launch: {w}")
     return 0
 
 def cmd_info(a):
-    for p in a:
+    for p in positional(a):
         blob = load(p); ents = parse(blob)
         c = {}
         for n,o,s in ents:
@@ -119,8 +438,9 @@ def cmd_info(a):
     return 0
 
 def cmd_unpack(a):
-    if len(a)<2: print("usage: cmr2lab unpack <in.bfl> <dir>"); return 2
-    src, dst = a[0], a[1]
+    pos = positional(a)
+    if len(pos)<2: print("usage: cmr2lab unpack <in.bfl> <dir>"); return 2
+    src, dst = pos[0], pos[1]
     os.makedirs(dst, exist_ok=True)
     ents = extract(load(src)); n=0
     for name, data in ents:
@@ -131,8 +451,9 @@ def cmd_unpack(a):
     return 0
 
 def cmd_pack(a):
-    if len(a)<2: print("usage: cmr2lab pack <dir> <out.bfl>"); return 2
-    src, dst = a[0], a[1]
+    pos = positional(a)
+    if len(pos)<2: print("usage: cmr2lab pack <dir> <out.bfl>"); return 2
+    src, dst = pos[0], pos[1]
     ents=[]
     for root, dirs, files in os.walk(src):
         for f in sorted(files):
@@ -143,13 +464,15 @@ def cmd_pack(a):
     return 0
 
 def cmd_repack(a):
-    """unpack -> rebuild -> prove byte-identical, one file or a whole tree"""
     targets=[]
-    for x in (a or []):
+    for x in positional(a):
         if os.path.isdir(x):
             for root,dirs,files in os.walk(x):
                 targets += [os.path.join(root,f) for f in files if f.lower().endswith('.bfl')]
         else: targets.append(x)
+    if not targets:
+        info, _, _, _ = locate(arg_path(a))
+        if info: targets = [os.path.join(info['data'],'Cars')]
     if not targets: print("usage: cmr2lab repack <file.bfl|dir>"); return 2
     ok=0; bad=[]; skip=[]
     for p in sorted(targets):
@@ -166,14 +489,18 @@ def cmd_repack(a):
     return 0 if not bad else 1
 
 def cmd_list(a):
-    g = find_game()
-    if not g: print("game not found"); return 1
-    what = a[0] if a else 'all'
-    for sub in (['Cars','Tracks'] if what=='all' else [what.capitalize()]):
-        d = os.path.join(g, sub)
+    info, _, _, _f = locate(arg_path(a))
+    if not info: print("game not found — try: cmr2lab where"); return 1
+    what = (positional(a) or ['all'])[0]
+    if what == 'all':
+        subs = [('Cars', os.path.join(info['data'],'Cars')),
+                ('Tracks', os.path.join(info['data'],'Tracks'))]
+    else:
+        subs = [(what.capitalize(), os.path.join(info['data'], what.capitalize()))]
+    for label, d in subs:
         if not os.path.isdir(d): continue
         fs = sorted(f for f in os.listdir(d) if f.lower().endswith('.bfl'))
-        print(f"\n{sub}  ({len(fs)})")
+        print(f"\n{label}  ({len(fs)})")
         for f in fs[:40]: print("   ", f)
         if len(fs)>40: print(f"    ... +{len(fs)-40}")
     return 0
@@ -184,39 +511,124 @@ def cmd_tabs(a):
         mark = '●' if k=='cmr2' else '○'
         print(f"  {mark} {k:5s} {v}")
     print("\n  CMR2 tab: live today — unpack/repack/upscale on the original game.")
-    print("  CMR3 tab: opens when content is imported under <game>/cmr3.")
-    print("            (the PP_F geometry layout for CMR2 cars is parsed already")
-    print("             -- 259/259 close exactly; see docs/C3D.md.)")
+    print("  CMR3 tab: opens when content is imported under <root>/cmr3.")
     return 0
 
+def launch_warnings(exe):
+    """everything about a launcher target that a .desktop file cannot tell you"""
+    w = []
+    if not exe: return w
+    if not os.path.isfile(exe):
+        return ['%s is not a file' % exe]
+    if not os.access(exe, os.X_OK):
+        w.append('NOT executable (mode %03o) — a desktop/Steam shortcut will not '
+                 'run it as-is' % (os.stat(exe).st_mode & 0o777))
+    try:
+        pe = open(exe, 'rb').read(2) == b'MZ'
+    except OSError:
+        pe = False
+    if pe:
+        w.append('Windows executable — needs Proton or Wine; Steam runs it only '
+                 'if the shortcut is set to force a compatibility tool')
+    return w
+
+def resolve_exe(a, info):
+    """-> (exe|None, label|None, notes) — says exactly why, never falls back quietly"""
+    notes = []
+    x = flag_value(a, '--exe')
+    if x: return x, 'given with --exe', notes
+    envb = os.environ.get('CMR2_BIN')
+    if envb: return envb, '$CMR2_BIN', notes
+    want_native = '--native' in a
+    want_retail = '--retail' in a
+    if want_retail:
+        if info['retail']: return info['retail'], 'retail', notes
+        notes.append('--retail asked for, but there is no CMR2.exe in %s' % info['root'])
+        if info['native']:
+            notes.append('the native port IS there (%s) — use --native for it'
+                         % info['native'])
+        return None, None, notes
+    if want_native:
+        if info['native']: return info['native'], 'native port', notes
+        notes.append('--native asked for, but there is no port binary in %s'
+                     % info['root'])
+        notes.append('NOT falling back to the original executable on its own')
+        return None, None, notes
+    if info['native']: return info['native'], 'native port', notes
+    if info['retail']: return info['retail'], 'retail', notes
+    notes.append('there is nothing in %s that can be launched' % info['root'])
+    return None, None, notes
+
 def cmd_install(a):
-    """write a Steam 'non-Steam game' launcher"""
-    g = find_game(a[0] if a else None)
-    if not g: print("game not found"); return 1
-    exe = None
-    for f in os.listdir(g):
-        if f.lower() in ('cmr2.exe','cmr2'): exe=os.path.join(g,f)
-    launcher = os.path.join(os.path.expanduser('~'), '.local/share/applications/cmr2lab.desktop')
-    os.makedirs(os.path.dirname(launcher), exist_ok=True)
+    """write a launcher that points at something real"""
+    info, log, fail, _f = locate(arg_path(a))
+    if fail:
+        print("no launcher written.  you pointed me at a path that is not a CMR2 install:")
+        print("  reason: " + fail)
+        return 1
+    if not info:
+        print("game not found — no launcher written.\n")
+        print("  cmr2lab where                 # see every place searched")
+        print("  cmr2lab install --path /path/to/Colin McRae Rally 2.0")
+        return 1
+
+    exe, label, notes = resolve_exe(a, info)
+    print(f"cmr2lab {VERSION}")
+    print(f"  install root : {info['root']}")
+    print(f"  content dir  : {info['data']}")
+    print()
+    for n in notes: print("  ! " + n)
+    if not exe:
+        print("  nothing written.")
+        print("  give me the thing to launch:  cmr2lab install --exe /path/to/cmr2")
+        for h in HINT_DOORS:
+            p = os.path.expanduser(h)
+            if os.path.isfile(p):
+                print(f"  on this machine, {p} is the door that picks a build "
+                      "that can actually drive — --exe it if you want that.")
+        return 1
+
+    name = flag_value(a, '--name') or 'Colin McRae Rally 2.0'
     body = textwrap.dedent(f"""\
         [Desktop Entry]
         Type=Application
-        Name=Colin McRae Rally 2.0 (cmr2lab)
-        Comment=Native port / content lab
-        Exec={exe or g}
-        Path={g}
+        Version=1.0
+        Name={name}
+        Comment=Colin McRae Rally 2.0 — native port / content lab
+        Exec={exe}
+        Path={info['root']}
         Icon=applications-games
         Categories=Game;
         Terminal=false
         """)
-    open(launcher,'w').write(body); os.chmod(launcher, 0o755)
-    print(f"wrote {launcher}")
-    print(f"  Exec={exe or g}")
-    print("\nSteam: Games > Add a Non-Steam Game > Browse > pick 'Colin McRae Rally 2.0 (cmr2lab)'")
+
+    print(f"  launching    : {exe}   [{label}]")
+    for w in launch_warnings(exe):
+        print("  ! " + w)
+    print()
+
+    if '--dry-run' in a:
+        print("--- would write " + (flag_value(a,'--out') or
+                                    '~/.local/share/applications/cmr2lab.desktop'))
+        print(body, end='')
+        print("--- (nothing written)")
+        return 0
+
+    dest = flag_value(a, '--out') or os.path.join(os.path.expanduser('~'),
+                                                  '.local/share/applications/cmr2lab.desktop')
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, 'w') as f: f.write(body)
+    os.chmod(dest, 0o755)
+    print(f"wrote {dest}")
+    print()
+    print("Steam:  Games > Add a Non-Steam Game > Browse > pick "
+          f"'{name}'")
+    print("        (Steam caches its list at startup — restart Steam if it is missing)")
     return 0
 
-CMDS = {'status':cmd_status,'info':cmd_info,'unpack':cmd_unpack,'pack':cmd_pack,
-        'repack':cmd_repack,'list':cmd_list,'tabs':cmd_tabs,'install':cmd_install}
+CMDS = {'where':cmd_where,'status':cmd_status,'info':cmd_info,
+        'unpack':cmd_unpack,'pack':cmd_pack,'repack':cmd_repack,
+        'list':cmd_list,'tabs':cmd_tabs,'install':cmd_install}
 
 def main():
     if len(sys.argv)<2 or sys.argv[1] in ('-h','--help','help'):

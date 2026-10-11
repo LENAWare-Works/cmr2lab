@@ -1,0 +1,639 @@
+#!/usr/bin/env python3
+"""
+cmr2install — the GUI installer. One page, in a browser, no terminal needed.
+
+    python3 cmr2install                 serve on 127.0.0.1:8092 and open the browser
+    python3 cmr2install --port 8099
+    python3 cmr2install --no-open       serve, do not open a browser
+    python3 cmr2install --check         run the detection once, print it, exit
+    python3 cmr2install --scan-json     same, machine readable
+
+It finds Colin McRae Rally 2.0's install in three tiers, exactly like the
+question asks:
+
+    TIER 1  the known/default locations for every way it gets installed
+            (Steam library, Steam Proton prefix, GOG/Wine prefix, disc, dev copy)
+    TIER 2  an automatic search of the whole plausible tree if tier 1 misses
+    TIER 3  point it at the folder yourself — a real browser, on the real
+            filesystem, because a web page cannot see absolute paths on its own
+
+Then it writes the launcher and shows you the exact line it wrote.
+
+Needs cmr2lab next to it (it borrows the detection and the .desktop writer —
+one place where the truth about what an install looks like lives).
+
+No dependencies. Python 3 stdlib only.
+"""
+import sys, os, json, argparse, webbrowser, importlib.util
+import importlib.machinery
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+def _load_lab():
+    """cmr2lab has no .py extension, so it cannot be imported by name."""
+    for p in (os.path.join(HERE, "cmr2lab"),
+              os.path.join(HERE, "cmr2lab.py"),
+              os.path.join(os.path.dirname(HERE), "cmr2lab")):
+        if os.path.isfile(p):
+            ld = importlib.machinery.SourceFileLoader("cmr2lab", p)
+            spec = importlib.util.spec_from_loader("cmr2lab", ld)
+            m = importlib.util.module_from_spec(spec)
+            ld.exec_module(m)
+            return m
+    return None
+
+SCAN_PATH = os.environ.get("CMR2_DIR") or None      # tier 1/2 can be pinned, same as --path
+lab = _load_lab()
+if lab is None:                                              # pragma: no cover
+    sys.stderr.write(
+        "cmr2install needs cmr2lab in the same folder.\n"
+        f"  looked in: {HERE}\n")
+    sys.exit(2)
+
+VERSION = "0.2.1"
+PORT_DEFAULT = 8092
+
+# Both images come out of the game's own FrontEnd/res1024.bfl -- generated from
+# its files by tools in this folder, never drawn by hand.
+LOGO_DATA = "data:image/png;base64,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"
+TEX_DATA  = "url(data:image/png;base64,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)"
+
+# ------------------------------------------------------------------- helpers --
+def _locate(**kw):
+    """cmr2lab.locate() changed shape: v0.2.0 returned (info, log), v0.2.2 returns
+    (info, log, hard_fail, found). Accept BOTH -- this file and cmr2lab are shipped
+    as a pair and have been out of step once already (the page 500'd)."""
+    try:
+        r = lab.locate(**kw)
+    except TypeError:                       # v0.2.0 locate() has no 'everything'
+        kw.pop("everything", None)
+        r = lab.locate(**kw)
+    if isinstance(r, (tuple, list)):
+        if len(r) >= 4:
+            info, log, fail, found = r[0], r[1], r[2], r[3]
+        elif len(r) == 2:
+            info, log = r
+            fail, found = None, ([('found', '', info)] if info else [])
+        else:                                              # unknown shape: best effort
+            info, log, fail, found = (r[0] if r else None), [], None, []
+    else:
+        info, log, fail, found = r, [], None, []
+    return info, list(log or []), fail, list(found or [])
+
+def scan():
+    """tier 1 + tier 2, through cmr2lab's own detect.
+
+    Lists EVERY install the search turns up, not just the first -- on a real Deck
+    there can be two (a dev copy and a GOG copy inside a Proton prefix) and which
+    one you want is yours to pick, not the tool's."""
+    _info, log, fail, found_infos = _locate(extra_path=SCAN_PATH, everything=True)
+    found = []
+    for label, path, info in found_infos:
+        if not isinstance(info, dict):
+            continue
+        c, t = lab.counts(info["data"])
+        found.append({
+            "root": info["root"],
+            "data": info["data"],
+            "native": info["native"],
+            "retail": info["retail"],
+            "cars": c, "tracks": t,
+            "how": label or next((l[1] for l in log if l[0] == "found"), "search"),
+        })
+    places = [{"state": s, "label": l, "path": p, "note": (n if isinstance(n, str) else "")}
+              for (s, l, p, n) in log]
+    return {"found": found, "places": places, "hard_fail": fail}
+
+def exes_in(d):
+    nat, ret = lab._exe_in(d)
+    return {"native": nat, "retail": ret}
+
+def looks_like_game(d):
+    """what a folder has to look like to be worth clicking"""
+    out = {"game_root": False, "content": False, "exe": []}
+    if not os.path.isdir(d):
+        return out
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return out
+    low = {n.lower(): n for n in names}
+    if "cars" in low and "tracks" in low:
+        out["content"] = True
+    g = [names[i] for i, n in enumerate(names) if n.lower() == "game"]
+    if g:
+        sub = os.path.join(d, g[0])
+        try:
+            sl = {n.lower() for n in os.listdir(sub)}
+        except OSError:
+            sl = set()
+        if "cars" in sl and "tracks" in sl:
+            out["content"] = True
+            out["game_root"] = True
+    for n in ("cmr2.exe", "cm2.exe", "cmr2", "cm2", "cmr2-native"):
+        if n in low:
+            out["exe"].append(os.path.join(d, low[n]))
+    return out
+
+def browse(path):
+    path = os.path.abspath(os.path.expanduser(path or os.path.expanduser("~")))
+    if not os.path.isdir(path):
+        path = os.path.expanduser("~")
+    try:
+        names = sorted(os.listdir(path), key=lambda s: s.lower())
+    except PermissionError:
+        return {"path": path, "parent": os.path.dirname(path),
+                "entries": [], "error": "no permission to read this folder",
+                "here": looks_like_game(path)}
+    entries = []
+    for n in names:
+        full = os.path.join(path, n)
+        if not os.path.isdir(full):
+            continue
+        if n in (".git", "node_modules", "__pycache__"):
+            continue
+        try:
+            if os.access(full, os.R_OK):
+                pass
+        except OSError:
+            continue
+        m = looks_like_game(full)
+        entries.append({"name": n, "path": full,
+                        "game": bool(m["game_root"] or m["content"]), "exe": m["exe"]})
+    parent = os.path.dirname(path.rstrip(os.sep)) or "/"
+    return {"path": path, "parent": parent, "entries": entries, "here": looks_like_game(path)}
+
+def write_launcher(root, exe, name, out=None):
+    """the same body cmr2lab writes — reusing one definition of 'a launcher'"""
+    import textwrap
+    name = (name or "").strip() or "Colin McRae Rally 2.0"
+    body = textwrap.dedent(f"""\
+        [Desktop Entry]
+        Type=Application
+        Version=1.0
+        Name={name}
+        Comment=Colin McRae Rally 2.0 — native port / content lab
+        Exec={exe}
+        Path={root}
+        Icon=applications-games
+        Categories=Game;
+        Terminal=false
+        """)
+    dest = out or os.path.join(os.path.expanduser("~"),
+                               ".local/share/applications/cmr2lab.desktop")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, "w") as f:
+        f.write(body)
+    os.chmod(dest, 0o755)
+    # read it back — the point is what got WRITTEN, not what we meant to write
+    back = open(dest).read()
+    exe_line = next((l.split("=", 1)[1] for l in back.splitlines()
+                     if l.startswith("Exec=")), "")
+    return {"ok": True, "written": dest, "exec": exe_line,
+            "exists": os.path.exists(exe_line),
+            "runnable": os.access(exe_line, os.X_OK),
+            "body": back}
+
+# ---------------------------------------------------------------------- page --
+PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Colin McRae Rally 2.0 — install</title>
+<style>
+/* palette lifted from the game's own FrontEnd bfl:
+   Greece  -> #8b0000 deep red, #fff300 gold
+   Finland -> #744032 / #955544 dirt, #dcd3b1 bone
+   Kenya   -> #dae8ec pale sky */
+:root{
+  --bg:#15100d; --bg2:#1d1613; --card:#241a15; --card2:#2c201a;
+  --line:#3d2a21; --line2:#523a2c;
+  --tx:#e8ddc8; --dim:#9d8874; --dim2:#6d5b4b;
+  --gold:#ffdb0e; --gold2:#fff300; --red:#8b0000; --red2:#c13030;
+  --ok:#7bb661; --warn:#d3a815; --bad:#c13030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);
+  font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+/* the game's own Finland menu texture, tiled, dimmed to a dusty wash */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url(TEX_PLACEHOLDER);
+  background-repeat:repeat;background-size:256px 128px;
+  opacity:.10;mix-blend-mode:screen}
+/* vignette + a warm dust gradient, so the page reads like a stage at dusk */
+body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255,219,14,.07), transparent 55%),
+    radial-gradient(90% 70% at 50% 120%, rgba(139,0,0,.20), transparent 60%),
+    linear-gradient(180deg, rgba(21,16,13,.35), rgba(21,16,13,.85) 60%, #15100d)}
+.wrap{position:relative;z-index:1;max-width:920px;margin:0 auto;padding:0 18px 90px}
+
+/* ---- header: the real logo out of the game ---- */
+header{padding:26px 0 4px;position:relative}
+.bar{height:5px;border-radius:3px;
+  background:linear-gradient(90deg,var(--red) 0%,var(--red) 38%,var(--gold) 38%,var(--gold) 62%,var(--bg2) 62%);
+  opacity:.9;margin-bottom:18px}
+.logo{display:block;width:min(100%,560px);height:auto;
+  filter:drop-shadow(0 3px 10px rgba(0,0,0,.75))}
+h1{font-size:27px;margin:12px 0 4px;letter-spacing:-.2px;font-weight:700}
+h1 .lre{color:var(--gold);font-weight:800}
+.sub{color:var(--dim);margin:0 0 6px}
+.tier{font-size:12.5px;color:var(--dim2);margin:10px 0 0;line-height:1.7}
+.tier b{color:var(--gold);font-weight:700}
+
+h2{font-size:13.5px;margin:36px 0 12px;color:var(--dim);font-weight:700;
+   text-transform:uppercase;letter-spacing:1.6px;display:flex;align-items:center;gap:10px}
+h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+
+.card{background:linear-gradient(180deg,var(--card2),var(--card));
+  border:1px solid var(--line);border-radius:14px;padding:18px;margin:12px 0;
+  box-shadow:0 2px 14px rgba(0,0,0,.35)}
+.card.good{border-color:#4a3a22;
+  box-shadow:inset 3px 0 0 var(--gold), 0 2px 14px rgba(0,0,0,.35)}
+.card.bad{border-color:#5a2b2b;box-shadow:inset 3px 0 0 var(--bad), 0 2px 14px rgba(0,0,0,.35)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:13.5px;
+  word-break:break-all;color:#d8cbb2}
+.k{color:var(--dim2);font-size:11.5px;text-transform:uppercase;letter-spacing:1.2px;
+   font-weight:700}
+
+button{font:inherit;font-size:15.5px;padding:11px 19px;border-radius:10px;
+  border:1px solid var(--line2);background:#2e221b;color:var(--tx);cursor:pointer;
+  transition:background .12s,border-color .12s,transform .06s}
+button:hover{background:#3a2b22;border-color:#6b4c39}
+button:active{transform:translateY(1px)}
+button.primary{background:linear-gradient(180deg,var(--gold2),var(--gold));
+  border-color:#e0be00;color:#1d1600;font-weight:800;letter-spacing:.2px;
+  text-shadow:0 1px 0 rgba(255,255,255,.35)}
+button.primary:hover{filter:brightness(1.06)}
+button:disabled{opacity:.38;cursor:default;filter:grayscale(.6)}
+
+input[type=text]{font:inherit;background:#0e0a08;color:var(--tx);
+  border:1px solid var(--line);border-radius:10px;padding:11px 13px;width:100%}
+input[type=text]:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,219,14,.12)}
+
+.pill{font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);
+  color:var(--dim);letter-spacing:.4px;font-weight:600;white-space:nowrap}
+.pill.ok,.pill.found{color:#b7e0a0;border-color:#3d5a30;background:rgba(123,182,97,.10)}
+.pill.miss{color:var(--dim2)}
+.pill.skip{color:#584a3d;border-color:#2a211b}
+.pill.bad{color:#e8a0a0;border-color:#5a2b2b;background:rgba(193,48,48,.10)}
+.pill.gold{color:var(--gold);border-color:#6b5a10;background:rgba(255,219,14,.08)}
+
+details summary{cursor:pointer;color:var(--dim);font-size:13.5px}
+details summary:hover{color:var(--gold)}
+.places{margin-top:12px}
+.place{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #241a15;
+  align-items:baseline;font-size:13px}
+.place:last-child{border-bottom:0}
+.place .lbl{width:200px;color:var(--dim2);flex:none}
+.place .pth{font-family:ui-monospace,Menlo,monospace;color:#c4b6a0;word-break:break-all}
+
+.crumbs{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;color:#d8cbb2;
+  background:#0e0a08;border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;word-break:break-all;margin-bottom:10px}
+.entry{display:flex;gap:11px;align-items:center;padding:11px 12px;border-radius:10px;
+  cursor:pointer;border:1px solid transparent}
+.entry:hover{background:#2a1f18;border-color:var(--line2)}
+.entry.game{background:rgba(123,182,97,.09);border-color:#3d5a30}
+.entry .nm{flex:1;word-break:break-all}
+.jump{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.jump button{padding:8px 13px;font-size:13.5px}
+
+label.rad{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:10px;
+  border:1px solid var(--line);cursor:pointer;margin:6px 0;background:#1d1613}
+label.rad:hover{border-color:var(--line2);background:#251c17}
+label.rad input{margin-top:4px;accent-color:var(--gold)}
+label.rad .sm{color:var(--dim2);font-size:13px}
+
+pre{background:#0e0a08;border:1px solid var(--line);border-radius:10px;padding:14px;
+  overflow:auto;font-size:12.5px;margin:10px 0 0;color:#c4b6a0}
+.spin{color:var(--dim2)}
+.err{color:#e8a0a0}
+.ok{color:#b7e0a0}
+footer{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);
+  color:var(--dim2);font-size:12.5px;line-height:1.8}
+footer a{color:var(--dim);text-decoration:none;border-bottom:1px dotted var(--line2)}
+</style></head><body><div class="wrap">
+
+<header>
+<div class="bar"></div>
+<img class="logo" alt="Colin McRae Rally 2.0" src="LOGO_PLACEHOLDER">
+<h1>LRE <span class="lre">Installer</span></h1>
+<p class="sub">Find the game, write a launcher. Nothing is uploaded and nothing leaves this machine.</p>
+</header>
+<div id="tiers" class="tier"></div>
+
+<h2 id="h-found">Where it is</h2>
+<div id="found"><div class="spin">Looking…</div></div>
+<button id="rescan" style="margin-top:10px">Search again</button>
+
+<h2>Can't find it? Point at it</h2>
+<p class="sub" id="browsehint">This is the real folder list, so it shows you real paths.</p>
+<div class="jump">
+  <button onclick="jump('~')">Home</button>
+  <button onclick="jump('~/.wine/drive_c')">Wine</button>
+  <button onclick="jump('~/.local/share/Steam/steamapps/common')">Steam</button>
+  <button onclick="jump('/run/media/'+USER)">Removable</button>
+  <button onclick="jump('/')">/</button>
+</div>
+<div class="crumbs" id="cwd">…</div>
+<div class="row" style="margin-bottom:10px">
+  <button id="up">▲ Up</button>
+  <label class="pill" style="cursor:pointer"><input type="checkbox" id="hid"> show hidden</label>
+  <button id="usethis" class="primary" disabled>Use this folder</button>
+</div>
+<div id="list"></div>
+
+<h2>What the launcher says</h2>
+<label class="k" for="nm">Name in Steam</label>
+<input type="text" id="nm" value="CMR2.0 LRE" style="margin:6px 0 14px">
+<label class="rad"><input type="radio" name="m" value="auto" checked>
+  <span><b>Whatever is there</b><br><span class="sm">the native port if one is present, otherwise the original .exe</span></span></label>
+<label class="rad"><input type="radio" name="m" value="native">
+  <span><b>The native port</b><br><span class="sm">cmr2-native / cmr2 in the install root — warns if there isn't one</span></span></label>
+<label class="rad"><input type="radio" name="m" value="retail">
+  <span><b>The original CMR2.exe</b><br><span class="sm">the retail binary, run through whatever Wine setup you have</span></span></label>
+
+<div class="row" style="margin-top:18px">
+  <button id="go" class="primary" disabled>Write the launcher</button>
+  <span id="picked" class="pill">nothing picked yet</span>
+</div>
+<div id="result"></div>
+
+<footer>
+Colin McRae Rally 2.0 \u2014 Linux Rally Edition. This installer only ever writes one file:
+a desktop launcher in <span class="mono">~/.local/share/applications/</span>.
+It does not touch your game, it does not download anything, and it does not phone home.<br>
+Palette and texture taken from the game's own FrontEnd files.
+</footer>
+</div><script>
+var USER = USERNAME_PLACEHOLDER;
+var state = { root:null, exe:null, data:null, picked:null };
+
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+  return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+
+async function api(path, body){
+  var o = { method: body ? 'POST' : 'GET' };
+  if(body){ o.headers = {'Content-Type':'application/json'}; o.body = JSON.stringify(body); }
+  var r = await fetch(path, o);
+  return await r.json();
+}
+
+function paintTiers(){
+  el('tiers').innerHTML =
+    '<b>1</b> the usual places, for every kind of install &nbsp;·&nbsp; ' +
+    '<b>2</b> if that misses, it searches underneath &nbsp;·&nbsp; ' +
+    '<b>3</b> and if it still misses, you point at the folder yourself. ' +
+    'Any of the three is fine \u2014 the only thing that matters is that it ends up ' +
+    'pointing at a real .exe.';
+}
+
+async function doScan(){
+  el('found').innerHTML = '<div class="spin">Searching…</div>';
+  var d = await api('/api/scan');
+  renderFound(d);
+}
+
+function renderFound(d){
+  var h = '';
+  if(!d.found.length){
+    h += '<div class="card"><b>Nothing found automatically.</b>' +
+         '<p class="sub">That is fine — use the folder list below and point at it. ' +
+         'Everything that was checked is listed underneath.</p></div>';
+  }
+  d.found.forEach(function(f, i){
+    h += '<div class="card good">' +
+      '<div class="row"><span class="pill found">found</span>' +
+      '<span class="pill">'+esc(f.how)+'</span>' +
+      '<span class="pill">'+f.cars+' cars</span><span class="pill">'+f.tracks+' tracks</span></div>' +
+      '<p class="k" style="margin:14px 0 2px">install root</p>' +
+      '<div class="mono">'+esc(f.root)+'</div>' +
+      '<p class="k" style="margin:12px 0 2px">content folder</p>' +
+      '<div class="mono">'+esc(f.data)+'</div>' +
+      '<p class="k" style="margin:12px 0 2px">executables</p>' +
+      '<div class="mono">'+(f.native?'native port: '+esc(f.native)+'<br>':'native port: <span class="err">none</span><br>') +
+      (f.retail?'retail: '+esc(f.retail):'retail: <span class="err">none</span>')+'</div>' +
+      '<div class="row" style="margin-top:16px">' +
+      '<button class="primary" onclick="pick(\''+i+'\')">Use this</button></div></div>';
+  });
+  var p = '<div class="places">';
+  d.places.forEach(function(x){
+    p += '<div class="place"><span class="pill '+x.state+'">'+x.state+'</span>' +
+         '<span class="lbl">'+esc(x.label)+'</span>' +
+         '<span class="pth">'+esc(x.path)+(x.note?' <span class="k">'+esc(x.note)+'</span>':'')+'</span></div>';
+  });
+  p += '</div>';
+  el('found').innerHTML = h + '<details><summary class="sub" style="cursor:pointer;margin-top:14px">' +
+    'every place checked ('+d.places.length+')</summary>'+p+'</details>';
+  window._found = d.found;
+}
+
+function pick(i){
+  var f = window._found[i];
+  state.root = f.root; state.data = f.data; state.exe = f.native || f.retail;
+  state.picked = 'auto-found';
+  el('picked').textContent = 'picked: ' + f.root;
+  el('go').disabled = !state.exe;
+  if(!state.exe) el('picked').textContent = 'picked, but there is no executable in it';
+  window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'});
+}
+
+function jump(p){
+  p = String(p).replace('~', HOME_PLACEHOLDER);
+  load(p);
+}
+
+async function load(p){
+  var d = await api('/api/browse?path=' + encodeURIComponent(p));
+  state.cur = d.path;
+  el('cwd').textContent = d.path;
+  var h = '';
+  if(d.error) h += '<div class="card err">'+esc(d.error)+'</div>';
+  var entries = d.entries.filter(function(e){ return el('hid').checked || e.name[0] !== '.'; });
+  entries.forEach(function(e){
+    h += '<div class="entry'+(e.game?' game':'')+'" onclick="load(\''+
+         esc(e.path).replace(/'/g,"\\'")+'\')">' +
+         '<span>'+(e.game?'🎮':'📁')+'</span><span class="nm">'+esc(e.name)+'</span>' +
+         (e.game?'<span class="pill ok">looks like the game</span>':'') +
+         (e.exe.length?'<span class="pill">exe</span>':'')+'</div>';
+  });
+  if(!entries.length) h += '<div class="card"><span class="sub">No folders in here.</span></div>';
+  el('list').innerHTML = h;
+
+  var here = d.here;
+  var usable = here.exe.length > 0 || here.content;
+  el('usethis').disabled = !usable;
+  el('usethis').onclick = function(){
+    state.root = d.path;
+    state.exe = here.exe[0] || null;
+    state.picked = 'you picked it';
+    el('picked').textContent = 'picked: ' + d.path;
+    el('go').disabled = !state.exe;
+    if(!state.exe) el('picked').textContent =
+      'this folder has the game content but no .exe in it — go up one level';
+    window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'});
+  };
+  el('usethis').textContent = here.exe.length
+      ? 'Use this folder (has an .exe)'
+      : (here.content ? 'Use this folder (content only)' : 'Use this folder');
+}
+
+async function go(){
+  var mode = document.querySelector('input[name=m]:checked').value;
+  var d = await api('/api/install', { root: state.root, exe: state.exe,
+                                      name: el('nm').value, mode: mode });
+  var h = '';
+  if(d.ok){
+    h += '<div class="card good"><div class="row"><span class="pill ok">written</span>' +
+         '<span class="pill">'+esc(mode)+'</span></div>' +
+         '<p class="k" style="margin:14px 0 2px">file</p><div class="mono">'+esc(d.written)+'</div>' +
+         '<p class="k" style="margin:12px 0 2px">it launches</p><div class="mono">'+esc(d.exec)+'</div>' +
+         '<p class="k" style="margin:12px 0 2px">checked</p><div class="mono">' +
+         (d.exists?'the file is there':'<span class="err">the file is NOT there</span>') + ' · ' +
+         (d.runnable?'it is executable':'<span class="err">it is not executable</span>') +
+         '</div>' +
+         '<h2 style="margin-top:22px">In Steam</h2>' +
+         '<p class="sub">Games ▸ Add a Non-Steam Game ▸ Browse ▸ pick <b>'+esc(el('nm').value)+
+         '</b><br>Steam builds that list when it starts. If it is not there, restart Steam.</p>' +
+         '<details><summary class="sub" style="cursor:pointer">the file it wrote</summary>' +
+         '<pre>'+esc(d.body)+'</pre></details></div>';
+  } else {
+    h += '<div class="card"><b class="err">Not written.</b><p class="sub">'+esc(d.why||'')+'</p></div>';
+  }
+  el('result').innerHTML = h;
+  if(d.ok) el('result').scrollIntoView({behavior:'smooth'});
+}
+
+el('rescan').onclick = doScan;
+el('up').onclick = async function(){
+  var d = await api('/api/browse?path=' + encodeURIComponent(el('cwd').textContent));
+  load(d.parent);
+};
+el('hid').onchange = function(){ load(el('cwd').textContent); };
+el('go').onclick = go;
+paintTiers(); doScan(); load(HOME_PLACEHOLDER);
+</script></body></html>
+"""
+
+# --------------------------------------------------------------------- server --
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+    def _send(self, code, ctype, body):
+        if isinstance(body, str):
+            body = body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+    def _json(self, obj, code=200):
+        self._send(code, "application/json", json.dumps(obj))
+    def do_GET(self):
+        u = urlparse(self.path)
+        if u.path in ("/", "/index.html"):
+            home = os.path.expanduser("~")
+            page = (PAGE.replace("USERNAME_PLACEHOLDER", json.dumps(os.environ.get("USER", "deck")))
+                        .replace("HOME_PLACEHOLDER", json.dumps(home))
+                        .replace("LOGO_PLACEHOLDER", LOGO_DATA)
+                        .replace("TEX_PLACEHOLDER", TEX_DATA))
+            return self._send(200, "text/html; charset=utf-8", page)
+        if u.path == "/api/scan":
+            return self._json(scan())
+        if u.path == "/api/browse":
+            q = parse_qs(u.query)
+            return self._json(browse((q.get("path") or ["~"])[0]))
+        return self._json({"error": "not found"}, 404)
+    def do_POST(self):
+        u = urlparse(self.path)
+        if u.path != "/api/install":
+            return self._json({"error": "not found"}, 404)
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            req = json.loads(self.rfile.read(n) or b"{}")
+        except Exception as e:
+            return self._json({"ok": False, "why": f"bad request: {e}"})
+        root = req.get("root")
+        exe = req.get("exe")
+        mode = req.get("mode", "auto")
+        if not root or not os.path.isdir(root):
+            return self._json({"ok": False, "why": f"no such folder: {root}"})
+        # mode decides the exe, and a mode that cannot be honoured says so
+        nat, ret = lab._exe_in(root)
+        if mode == "native":
+            if not nat:
+                return self._json({"ok": False,
+                    "why": "you asked for the native port and there is no cmr2-native "
+                           "(or cmr2) in " + root})
+            exe = nat
+        elif mode == "retail":
+            if not ret:
+                return self._json({"ok": False,
+                    "why": "you asked for the original CMR2.exe and there is none in " + root})
+            exe = ret
+        else:
+            exe = nat or ret or exe
+        if not exe:
+            return self._json({"ok": False, "why": "no executable to launch in " + root})
+        if not os.path.isabs(exe):
+            exe = os.path.join(root, exe)
+        if not os.path.exists(exe):
+            return self._json({"ok": False, "why": f"the executable is not there: {exe}"})
+        try:
+            out = req.get("out") or None
+            return self._json(write_launcher(root, exe, req.get("name"), out))
+        except Exception as e:
+            return self._json({"ok": False, "why": f"could not write it: {e}"})
+
+# ----------------------------------------------------------------------- main --
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--port", type=int, default=PORT_DEFAULT)
+    ap.add_argument("--no-open", action="store_true")
+    ap.add_argument("--check", action="store_true")
+    ap.add_argument("--scan-json", action="store_true")
+    a = ap.parse_args()
+
+    if a.scan_json:
+        print(json.dumps(scan(), indent=2)); return 0
+    if a.check:
+        d = scan()
+        print(f"cmr2install {VERSION} — detection only, nothing written")
+        if not d["found"]:
+            print("\nNOT FOUND. Places checked:")
+            for p in d["places"]:
+                print(f"  [{p['state']}] {p['label']:<26} {p['path']} {p['note']}")
+            print("\n-> point at it yourself in the browser (tier 3), or:")
+            print("   cmr2install   then use the folder list.")
+            return 1
+        for f in d["found"]:
+            print(f"\n  root     : {f['root']}")
+            print(f"  content  : {f['data']}   ({f['cars']} cars, {f['tracks']} tracks)")
+            print(f"  native   : {f['native'] or '- none -'}")
+            print(f"  retail   : {f['retail'] or '- none -'}")
+            print(f"  found via: {f['how']}")
+        return 0
+
+    srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    url = f"http://127.0.0.1:{a.port}/"
+    print(f"cmr2install {VERSION}")
+    print(f"  {url}          (this machine only)")
+    print("  Ctrl-C to stop")
+    if not a.no_open:
+        try: webbrowser.open(url)
+        except Exception: pass
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped.")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

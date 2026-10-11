@@ -12,15 +12,18 @@ came from another lane's run rather than mine, it says so.
 
 ## 1. RIGHT NOW
 
-**The binary Miami plays can drive a car again, and he launched it himself at 11:06:05.**
+**The play binary on his icon is NOT the one this section used to name. Relinked at 12:04:43;
+the bytes he drove two stages on at ~11:20 are preserved, and both pass the drive gate.**
+(corrected 2026-10-11 15:1x, §1 was written 11:1x and went stale four minutes after the clock moved)
 
 | | |
 |---|---|
-| binary | `work/PLAY/out-plain/cmr2`, md5 `80d927b54f597dbb2ad7590ddb6875e7`, 17,703,640 bytes, linked **11:02 today** |
-| does it drive? | yes — `cmr2_drives` returns 0 (`tools/drivecheck.sh`, run just now on this file) |
-| how it got there | `build-play-lre.sh` recompiled 9 stale TUs and linked; the result is **byte-identical** to `work/HUD-2D/out3/cmr2`, which another lane built independently at 10:45 — two lanes, same tree, same bytes |
-| his own launch, from the launcher's log | `2026-07-11 11:06:05  LAUNCH  …/out-plain/cmr2  md5=80d927b54f59  skipped-dead: none` — quoted verbatim, including the launcher's own month bug (`07` for `10`; the system clock reads 2026-10-11 and `journalctl` agrees) |
-| and it is alive | a `cmr2` process on that path was running while this was written (PID 3787186, 6 min 28 s of uptime, RSS 128 MB, argv = the full path to that binary) |
+| binary ON DISK NOW | `work/PLAY/out-plain/cmr2`, md5 **`9ecbf87bb8650a3883b188f4e77890e4`**, 17,714,716 bytes, mtime **2026-10-11 12:04:43** |
+| the bytes he actually drove (11:02 link) | md5 `80d927b54f597dbb2ad7590ddb6875e7`, 17,703,640 bytes — preserved at `out-plain/cmr2.bak-pre-pause-unlatch-20261011`, byte-identical to `work/HUD-2D/out3/cmr2` (two lanes, same tree, same bytes, 10:45) |
+| does each drive? | yes, both — `cmr2_drives` returns **0** on `9ecbf87b…` *and* on the `80d927…` backup (`tools/drivecheck.sh`, re-run 15:14 on these exact files) |
+| what the 12:04 relink changed | two things, by `nm -S` symbol diff: **GameInfo** (pause-unlatch, `GameInfo.cpp`) and **rhi/a7_vk32.o** — `build-play-lre.sh` links the *shared* RHI object, so `9ecbf87b…` is the first binary in the workspace carrying the peer's 11:36–11:47 near-plane work (21 new symbols, `g_nearclip`, `g_nearw`, `ap_update`, …) |
+| his own launches, from the launcher's log | the whole ledger is **three lines, all `80d927b54f59`**, last one `2026-10-11 11:06:05  LAUNCH  …/out-plain/cmr2  md5=80d927b54f59  skipped-dead: none` (re-read 15:1x). **Nothing after 11:06:05** — so a run he made after 12:04 did *not* come through the gated launcher, and which bytes he was looking at then is not provable from this log either way |
+| and it is alive | a `cmr2` process was running while this was written — but it is the **menu-car lane's** build (`MENU-CAR-FLATTENED/out-md9/cmr2`, pid 277263, started 15:03), not his play binary. The GPU is not free |
 
 **The deadness window, and why it matters more than any single number here:** from
 **08:39:06 to 11:02 today** no binary in this workspace could move a car. Our own
@@ -51,8 +54,14 @@ It is cheap: `DECK_RACE_TRACE=1` is already compiled into that binary, and one
 `drive.py` run turns "the gate says it can" into "it did". Until that exists, this file
 says *drivable*, not *driven*.
 
+**The skybox signature the phone asked about (15:0x):** "game UI present, no 3D stage content"
+is a **different signature from the 10:06 state** (skybox and no UI at all), and he finished two
+full stages at ~11:20 — so stage loading works and this is an intermittent, not a wall. The one
+fact that matters for it is the md5 row above: the binary changed under him at 12:04:43.
+
 **Also in flight right now, with no result to quote yet:** the sky/Finland lane
-(worker 2, started 11:07) and the HUD-2D lane's round on the in-race HUD.
+(worker 2, started 11:07), the HUD-2D lane's round on the in-race HUD, and the menu-car lane
+(`out-md9`, running on the GPU as this was written).
 
 ---
 
@@ -710,3 +719,52 @@ and compare the frame: if it is byte-identical, the car's draws contribute zero 
 page and the fault is in the 3D submit/raster path, not in composition) — `LENA_MENUSKIP2D`'s
 twin, ten lines away in the same file. `git push origin HEAD` still fails on this box (no
 credential helper); the commit is local.
+
+### setup-menu car r10, addendum 15:2x — **THE CAR'S 29 DRAWS DO PAINT. THEY PAINT A FLAT SLAB OF ONE COLOUR OVER THE MENU.**
+
+`LENA_MENUSKIP2D`'s twin, `LENA_MENUSKIP3D` (drops every indexed 3D draw while `/tmp/skip3d`
+exists), built into `out-md9/cmr2`. First attempt (`md_skip3`) did nothing and **its own log said
+why**: `grep -c MENUSKIP3D` = 0 — no init line — while the same log had 8,688 `MENUORDER` lines
+with `3d=29`, i.e. the gate was in `DrawPrimitiveVB` (which this page never calls) instead of
+`DrawIndexedPrimitiveVB` (the call the car's 29 draws actually use). Moved, rebuilt
+(`out-md9/cmr2` md5 `d3e90a99dd83bda86f1d180e9c82e52a`), re-run as **`md_skip3b` 15:09–15:2x**:
+this time the log carries `[MENUSKIP3D] on:` and `[MENUSKIP3D] frame end: skipped=29 skip3d=1`
+for every frame of the treatment.
+
+**The A/B, same page, same process, adjacent frames, one file apart — and it MOVES:**
+
+| | frame 0040 arm A (car submitted) | frame 0072 arm B (car's 29 draws dropped) |
+|---|---|---|
+| dominant colour | (140,149,158) **96.48 %** | (140,149,158) **86.31 %** |
+| distinct colours | 826 | 254 |
+| car rect x160..1080 y280..560 non-background | **9.57 %** | **26.33 %** |
+
+**Pixdiff of the two frames: 175,878 pixels differ, bbox `x[0..1223] y[46..733]`, and the
+colours are unambiguous:**
+
+* in arm A those pixels are **(140,149,158)** — 140,044 of them, one flat colour;
+* in arm B the same pixels are **(231,235,198)** (56,113), (79,79,79) (19,618), (201,214,216)
+  (17,346), (199,199,212) (13,050), white (7,123) — **the menu's real content and its text**
+  (LightYellow backdrop, icons, glyphs).
+
+**So the car's 3D draws are rasterising and filling a ~140,000-pixel region — bigger than their own
+rect — with a single flat colour**, and what we have been calling "the clear colour everywhere" is
+in large part *the car itself, drawn flat*. Drop the car and the menu's real content appears.
+Put it back and the car is a flat one-colour sheet lying over the menu. **That is Miami's
+sentence, measured: "flattens into one place on the menu … one flat piece of paper."**
+
+**The frames pushed for this:** `frames/opt-preview_20261011-1520_r10_A_car-3D-submitted_FLAT-SLAB.png`
+(md5 `152a9fafb033f2de7f591f73cd1ad2cb`) and
+`frames/opt-preview_20261011-1520_r10_B_car-3D-dropped_MENU-REVEALED.png`
+(md5 `f5916050713b556e38a201e9aa2167a3`) — look at them side by side: A is what he sees, B is the
+same frame with only those 29 draws removed.
+
+**What the next instrument must name: where the flat colour comes from.** It is a *fragment*
+value, not a geometry or a depth or a cull or an ordering value — all of which are now excluded on
+this page. The three candidates are (i) the texture bound at those draws (a blank/never-uploaded
+texture, or the wrong one), (ii) the texture-stage 0 combine (the census logs
+`s0/t11`, `s0/t18`, `s0/t20`, `s0/t24` set 2,112 times and "texture-stage OPs set: 1:1200
+4:4224"), and (iii) the material (`flags.w` source=material vs vertex). One line added to
+`MENUDRAW` — the two bound texture handles and the material diffuse of the car's own draws, plus
+an arm that forces texturing off — separates them, and it needs no new run machinery: the same
+`md_skip3b` route, the same trigger file.
