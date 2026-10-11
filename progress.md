@@ -1306,3 +1306,59 @@ I did not touch it, and it is no longer what it was when this round started** �
 `work/PLAY/out-plain/cmr2` was `b960621bcc5657e135640e35aa70869f` at 07:23 and is
 `97a9eb3b08595858a563282596680401` at 08:20 because the other worker's `out-death` round
 relinked it. My A/B ran `out-owner/cmr2` (the current tree's instrumented build).
+
+---
+
+**2026-10-11 08:2x — the menu-car addendum: the arithmetic is airtight, and the round's own
+numbers did not come from that screen.** (`MENU-CAR-EVIDENCE-VISION`, worker 2; evidence in
+`docs/MENU-CAR-EVIDENCE.md`. No game run this round — the display-death ticket held the
+GPU, and the phone ranks that one first.) Three things, all measured from bytes already on
+disk:
+
+* **The instrument never saw the screen the complaint is about.** The option-menu camera
+  `eye=(0.14 -0.09 -5.00)` appears in `owner1`…`owner5` and in **none** of the runs that
+  carried `DECK_IDXTRACE` (`mk_raw`, `mk_sub`, `mq_*`, `mp_sub`, `mcafter_sub`,
+  `idxtrace_race`, `idxfix_race`). Those runs' whole camera set is the frontend
+  `(-0.00 -0.00 -20.00)` and the race cameras. The 24 per-draw detail lines sit in one
+  window at **frame ≈2400** (right after `Race_LoadStageGeometry` /
+  `InRaceMenu_AdvanceCascade`), and the seven draw signatures that repeat from there are a
+  car in a **race**, every frame to the end of the run.
+  So "the pre-race / in-race menu car does NOT use the opposite convention" is
+  **over-claimed**: what was measured is the leftover trace of a route that never entered
+  that screen. (The quoted "40,000 draws" also matches no log here — the nearest is
+  `idxtrace_race.log` at 404,000 — flagged as a transcription slip, not a change of result.)
+* **The conclusion still holds, from the source and not from a sample.** All ten
+  `DrawIndexedPrimitiveVB` calls in the game, in five functions, hand either mesh-local
+  0-based indices with `startVert = vertexOffset`, or part-local indices already re-based by
+  `minIndex` with `startVert = vertexOffset + minIndex`. The shipped default reads
+  `startVert + idx` in both; `sub` reads `idx`. There is no call site that could want the
+  old re-base — and the preview/setup car is not a separate path: it is a `Mesh` that
+  `OptionPreview_RebuildDeformedGeometry` deforms per frame and re-uploads through
+  `Mesh_Rebuild`, drawn by the same functions. What a wrong base *would* look like is
+  exactly what the phone described (a neighbouring run of the same car buffer: car colours,
+  car-sized place, shards) — which is why her colour observation does not discriminate, and
+  why the arithmetic has to.
+* **The A/B now has the control it lacked.** Two runs of the *same* convention differ by
+  **1.61–1.67 %** of pixels; raw-vs-sub differs by **1.55–1.66 %**, in the *same* box
+  `x[146..1084] y[186..551]`. So the "2D frames do not move" claim is confirmed rather than
+  asserted — that box is an animated element, and at frame 2450, where the 3D is real, the
+  same pair differs over **91 %** of the frame (mean 70/255). Her patch (~150 px, below
+  vertical centre) is not that box; it is not in any capture this project holds.
+
+**Text, answered from the draw path because she asked which:** fonts load on both screens
+(`hel_*`, `lcd_*`, `ocr_*` TGAs, `mk_raw.log` 84–87 / 444–450), and
+`Font_DrawText → Font_DrawChar → Sprite_Queue → Sprite_DrawLayer →
+DrawPrimitive(D3DFVF_TLVERTEX)` is implemented end to end and used 1.66–1.87 M times per
+run (`0x1c4 TL`). Glyph quads land on layers 1/2, the only layers `Sprite_Queue` has and
+`Game.cpp:2667/2772-2778` draws every frame. Missing labels are therefore **not** a missing
+path; whether they reach pixels needs the same capture the A/B needs.
+
+**Next GPU window, in order:** (1) `LENA-MENUDRAW` — one line per indexed 3D draw with its
+FVF, stride, `startVert`, first indices and the **screen-space bbox of the vertices it
+actually read**, so the draw that owns a compact patch names itself in numbers; (2)
+`run_menuhunt.sh` + `menu_hunt.py` (written, untested — no GPU) — the screen was reached
+five times by runs that had foreign keys injected and never by the attract route, so a slow
+key burst at the frontend, watched for the camera line, is the cheapest route to it.
+Kernel ledger offered to the death ticket: no page fault, no `ring gfx_*` timeout and no
+`MODE2 reset` since **07:31:56**; the two today are 07:25:40 (pid 498908) and 07:31:49
+(pid 501251).
