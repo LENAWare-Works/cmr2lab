@@ -314,6 +314,91 @@ measurement since the last rewrite (mine, `work/MENU-CAR-FLATTENED/`, run 11:0x�
   finding is real and is the reason the earlier frames could not settle it — but it is a
   capture-latency fact, not a rasterisation one.
 
+* **The car page's own textures, read one at a time, and the alpha question turned into a list.
+  Measured fraction: still 0 — no cause shown to be the cause.** Round 6 of
+  `work/MENU-CAR-FLATTENED/` (12:19–12:4x EEST, four guarded runs) joined three traces that had
+  never been joined (`join_ids.py`): the game's own load (`[TEX] TGA <file> WxH surf=<p>`), the
+  port's id (`[TEXREQ] DD7 NEWID surf=<p> -> texId=<n>`, `deck_dd7.cpp:1349`) and the bytes the
+  GPU actually received (`[TEXDUMP] id=<n> … meanRGBA=… zeroAlpha=`, `a7_vk32.c:1589`).
+
+  The car page's draws (`md_texcar2`, frames 4075–4200, option camera `eye=(0.14 -0.09 -5.00)`)
+  bind **9 textures and 2,624 triangles, 419→601 owner cells (16.4→23.5 % of the frame)**:
+
+  | texId | size | alpha in the uploaded bytes | tris |
+  |---|---|---|---|
+  | **47** (the body) | 1024x1024 | meanRGBA=(115 115 122 **254**) zeroAlpha=0.2 % | 1,175 |
+  | 50 | 512x512 | (62 74 76 199) 3.6 % | 207 |
+  | 46 | 256x256 | (67 67 66 200) 21.5 % | 424 |
+  | 48 | 512x512 | (17 29 30 208) 0.0 % | 116 |
+  | 49 | 256x256 | (46 45 44 173) 31.8 % | 148 |
+  | 45 | 1024x1024 | (115 115 122 254) 0.2 % | 280 |
+  | 51 | 256x128 | (59 53 50 255) 0.0 % | 80 |
+  | **52** | 256x256 | (48 20 8 **0**) zeroAlpha=**100 %** | 58 |
+
+  **The body's texture arrives with alpha 254, so "its texture is transparent" is dead for the
+  body** — and so is the tidiest form of the 24-bit theory. What survives is the *computed*
+  alpha (`a7vk3d.frag`: `c.a = combine(alphaOp, alphaArg1, alphaArg2, t0, vDiffuse)`), i.e. the
+  vertex/material diffuse alpha, which nothing prints yet.
+
+* **Five captures inside the car's window, and the frame does not change.** `md_texcar2`'s
+  captures `.001…005` are frames **4078–4179** — five frames *inside* the car's own draw window,
+  522–1,653 `MENUDRAW` lines in flight — and they are **byte-identical**
+  (md5 `5b179735cafb5f48e45d6a79fed05d5d`): `distinct=3915`, dominant `(140,150,158)` **96.040 %**,
+  non-dominant 3.96 % in bbox `x[0..926] y[209..438]`, and the 64x40 grid shows only UI. The
+  2,624 submitted car triangles rasterise nothing, five times over. This closes the "one capture
+  cannot separate…" caveat by showing that *several* captures cannot either.
+
+* **A real port bug, found in the source, that is NOT the car's cause — but sits on the same
+  page.** `DeckDevice7::EnumTextureFormats` (`deck_dd7.cpp:1162-1179`) offers **one** format,
+  32-bit A8R8G8B8 *with* an alpha mask, on purpose. Real devices also offer a no-alpha 32-bit
+  format and the game is written for it (`Graphics.cpp:1982`: if no 24-bit format was enumerated,
+  substitute the 32-bit one). Then `CGraphics::LoadTGATexture`'s two branches disagree about the
+  same case — 16-bit dest writes `a = 0xff` for a 24-bit source, **32-bit dest writes `a = 0`** —
+  so with the port's 32-bit surfaces **every texel of every 24-bit TGA is written alpha 0**.
+  TexId **52** above is that, measured: real RGB `(48 20 8)`, alpha 0 on 100 % of texels. It is a
+  58-triangle part on this page and a defect in its own right (fix shape: offer the no-alpha
+  format *and* sample no-alpha textures as alpha 1.0, as a driver does) — not the ticket's answer.
+
+* **And the ready-made A/B cannot be aimed at this page.** `A7VK_AB=0:opaque` (blend off + alpha
+  test off for every draw) is the obvious experiment, and it was run this round **on a card that
+  was verified free** (`ps` empty, `gpu-guard.sh --list` empty, GPU 0 %): the run stayed at
+  `frontend resource mode -1 -> 0` and **never reached the menu**, exactly as the two 11:2x runs
+  did. That retires the "a peer held the card" explanation and leaves the mode harness itself as
+  the suspect. The instrument that replaced it is 3D-only: `LENA_MENUOPAQUE=1` in
+  `deck_dd7.cpp` builds `out-md3/cmr2`, which forces `ALPHABLENDENABLE=0`/`ALPHATESTENABLE=0`
+  **around indexed 3D draws only** and restores them after, plus `LENA_MENUDRAW_ALPHA=1`, which
+  prints each draw's atest/aref/afunc, blend src/dst, stage-0 alpha op/args and the first
+  vertex's own diffuse/specular dwords. Both inert when unset.
+
+* **The alpha inputs of the car's own draws, printed for the first time — and the arm that
+  removes them still does not put the car on screen.** `LENA_MENUDRAW_ALPHA=1` (new, in
+  `deck_dd7.cpp`, inert when unset) prints what the shader is built with:
+
+  ```
+  [ALPHADRAW] #1 fvf=0x2d2 stride=48 atest=1 aref=1 afunc=7 blend=1 src=5 dst=6
+              aop=4 aa1=2 aa2=0 v0_off24=ffffffff (a=255) v0_off28=ff000000
+  ```
+
+  alpha test **on**, ref 1/255, func GREATEREQUAL; blending **on**, SRCALPHA/INVSRCALPHA;
+  stage-0 alpha op MODULATE of (DIFFUSE × TEXTURE); the first vertex's own diffuse dword is
+  opaque white. With the body texture at alpha 254 that computes `c.a ≈ 0.996` — a draw that
+  should paint. Then `LENA_MENUOPAQUE=1` (also new: `ALPHABLENDENABLE=0` and
+  `ALPHATESTENABLE=0` around **indexed 3D draws only**, restored after each) was run on the car
+  page (`md_opq3`, f3650+, 587 cells / 2,747 tris): **the car is still not there.** Its cells
+  hold 1.60 % non-dominant pixels against the default arm's 11.01 % — and every one of those
+  11.01 % is 2D chrome. So the fragments are not being discarded by alpha test and are not being
+  blended away: **alpha is now excluded by measurement**, and the fork is down to the vertex the
+  GPU reads (the port's CPU-side view of the same buffer is car-shaped — `[GEO]` obj box
+  `x=[-2.1 2.1] y=[-0.5 0.7] z=[-0.9 0.9]`, `behind=0 nonfinite=0`) or the fragment never being
+  written at all. Caveat kept: the two frames above come from two runs, so this is "no car with
+  alpha off on that page", not a same-frame A/B — the same-frame A/B is what `LENA_MENUOPAQUE`
+  now makes possible for the next round (`A7VK_AB` cannot be aimed at this page at all, above).
+
+  PNGs, with the full table: `frames/opt-preview-car_20261011-1235_CAR-PAGE_default-arm.png`,
+  `frames/opt-preview-car_20261011-1237_CAR-PAGE_alpha-off-arm.png`,
+  `docs/MENU-CAR_car-page-round6.md`.
+
+
 **"A legible stage." Honest fraction: no measurable fraction on the picture — but the
 inputs to it are now correct.** The road textures draw (347,599 screens of `RD_GA`),
 the terrain draws in its own colour, and the transform is the game's own — the port's
@@ -369,3 +454,30 @@ evidence** about the port's correctness, only compile-level and run-level counts
   which throws away 548,489 values per run.
 * **Any number here about the port's correctness at runtime beyond what the logs say.**
   ASAN does not build; compile-level counts are labelled as such.
+
+### 2.6 HIS REVIEW, AND IT IS THE ONE THAT COUNTS — "textures were overall better"
+
+**Miami played the demo on the Deck at 2026-10-11 ~07:4x and said, in his own words:**
+*"the demo also worked here with Ford Focus and Kenya rally untill it didn't and froze
+which was coool / again super janky and white box under the car, textures were overall
+better tho"*.
+
+That is a **person who drives the game** reporting that the DXT5 decode fix (§2.1) is
+visible on real hardware, unprompted and without being shown a texel count. It is the
+only review that counts, and it is reported here **as his observation, not as a
+number** — the texel-level evidence stays in §2.1 and the two must not be conflated.
+
+Two further readings of the same sentence, both measured, are in the round-7 note for
+this ticket:
+
+* he reached a race **with a car he selected** (Ford Focus, not the default) — the
+  car-select path and the per-car model + livery load work well enough to be driven,
+  so do not "fix" that path on the strength of the white box;
+* the freeze he hit at 07:25/07:31 on 2026-10-11 is **not** the same kernel event as
+  the 2026-10-10 cluster: no ring timeout was recorded, and the reset was triggered by
+  **an amdgpu page fault raised by the `cmr2` process itself** at address
+  `0x8010682_000` (see the round-7 note). Same symptom, different mechanism.
+
+*(appended by the WHITE-BOX-UNDER-CAR ticket, round 7. If this paragraph is missing on
+re-read, a concurrent writer rewrote the file — the copy is kept at
+`work/WHITE-BOX-UNDER-CAR/progress.md.before-r7`.)*
