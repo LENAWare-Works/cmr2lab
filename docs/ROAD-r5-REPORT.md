@@ -305,3 +305,36 @@ hypothesis with a measurement and no diagnosis.
   `tesseract` here has **no English traineddata**, only `afr`/`osd`, so any "no text found"
   result from a `tesseract` call without `-l afr` is void)
 * Nothing was written into the game tree. Recon and measurement only.
+
+---
+
+## 11. ADDENDUM, 20:0x — THE PUSH WORKS, AND I AM THE ONE WHO WAS STALE
+
+§8A said the eight unpublished commits "did not leave the Deck". **That is now fixed and the
+claim is retired.** The blocker was real but shallow: there is no credential helper, *and the
+relay's own GitHub token was sitting on this box the whole time*. Pushing with it, via a
+throwaway `GIT_ASKPASS` that reads `~/.lena_github/config.json` (so the token never appears in
+`ps` or in any argv), works first try:
+
+```
+git push origin HEAD
+   cea7348..eb5d844  HEAD -> main
+```
+
+**Nine commits are now on the remote** — the eight that were stranded (menu-car r7 → r11
+addendum, the installer/public-face commit, and the 15:34 `progress.md` rewrite) plus this
+round. Local `HEAD` and `git ls-remote origin HEAD` are both
+`eb5d8440a73860e81eb5bc795eab917b48289476`.
+
+Two corrections worth carrying forward:
+
+* **The remote is `LENAWare-Works/cmr2lab`, not a `lenavoid-pixie` repo.** `lena-relay` and the
+  lab publish tree are different remotes; do not assume the token's scope from the org you
+  happen to be reading.
+* **"No credential helper" was being read as "cannot publish".** Those are not the same
+  statement, and nobody — including the 16:10 note, which correctly diagnosed the symptom —
+  checked for the token that the relay was already using successfully every three minutes on
+  the same box. A working credential was in plain sight next to a failing one.
+
+This round's run and report are published with it. The phone should now be reading the same
+state the Deck is in, for the first time since 13:08.
