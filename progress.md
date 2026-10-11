@@ -25,6 +25,33 @@ Paths, so they line up on both ends:
 |---|---|
 | the install | `~/lena/.lena_cmr2/game` (**638 MB** retail PC install; 259 `.c3d`, 220 car containers. It said 2.26 GB here — that was the disc-image copies in `gamedata/`, corrected §0b/§6) |
 
+## 0i. THE CAMERA AND THE NEAR PLANE — the race camera is the game's own and is sane, `znear` cannot smear a frame, and the road's paint owns 12.3% of one. added 2026-07-11 07:5x EEST by the `work/RACE` worker; appended, nothing above or below it touched
+
+**One line: the framing was not the fault — `znear` is 0.877–5.694 against a far plane of 200, and `w_clip = z_view` in this projection, so there is no `znear` term in NDC x or y at all; 100% of a race frame is stage geometry, and `RD_GA` (texId 102) owns 12.3% of one.**
+
+Full write-up and the four frames: **`docs/CAMERA-AND-NEAR-PLANE.md`** and **`frames/`**. The
+three numbers the line rests on:
+
+* **Where the in-race camera comes from.** `Scene_SetViewFromCamera` (`SceneNode.cpp:2503`)
+  inverts the camera **node's** world matrix into `D3DTRANSFORMSTATE_VIEW`; the near plane and
+  the zoom are exported per frame out of the blended camera record by `View_BlendCameraStates`
+  (`Car.cpp:8377`) into `View_SetPlayerProjection` (`FixedPoint.cpp:718`). There is no separate
+  race camera path in the port — the race sets the same three transform states the frontend
+  does, and the port latches all three.
+* **The eye is 3–50 units above the ground.** An earlier note read the VIEW **translation row**
+  as the camera position and got `y = −21.8`, i.e. under the ground. For a rigid row-vector view
+  matrix `eye·R = −t`; corrected, that same frame's eye is **(83.18, 18.53, 598.47)** looking
+  along `(0.994, 0.002, −0.113)`. The instrument now prints the eye directly.
+* **A coverage number that clips.** `tu_note` caps near-plane straddlers at 100 screens and
+  `gt2_note_cover` adds no area for any triangle not wholly inside NDC; neither clips. The new
+  one (`A7VK_OWNER=1`, inert when unset) clips against the eye plane and the viewport, then
+  z-buffers into a 64×40 grid keyed by texture id, resetting **every present**. Result: 100% of
+  every race frame is 3D stage geometry; `RD_GA` 12.3% of frame 3150; `KEN_1A` 33.0%.
+
+**Not claimed:** a legible road with verges, a car, a HUD or a timer. One class of attract shot
+puts three parked-car panel textures across the whole frame at 6.9–10.1 units, which is what
+"abstract mush with one edge" was; whether those cameras are the right cameras is not answered.
+
 ## 0h. NEITHER SIDE OWNED IT — the road textures ARE asked for and ARE bound; the port drew them from the wrong vertices. added 2026-10-11 06:0x EEST by the `work/RACE` worker; appended, nothing above or below it touched
 
 **One line: the game asks for `RD_GA`/`MRG_KN*`/`MOU_TER4A`/`TER_421C` on every frame of
