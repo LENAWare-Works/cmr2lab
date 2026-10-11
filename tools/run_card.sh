@@ -65,7 +65,11 @@ echo "--- KERNEL BEFORE ---"
 echo "ring0=$(ring) ring1=$(ring1) mode2=$(mode2) tcp=$(tcp)"
 
 # frame 3000 is ~53 s in (calibrated in run_framing.sh: 3319 -> t=57.2 s)
-SEQ=${SEQ:-"w14,k=enter,w6,k=enter,w6,k=enter,w60,w10"}
+# ONE key, then leave it alone: the attract mode fires by itself at ~30.5 s and drives
+# to a rally start (~frame 2400, calibrated in run_framing.sh: 3319 -> t=57.2 s).
+# Three Enters with 6 s gaps navigated into a menu and STALLED there -- measured,
+# card_probe run: backends census showed 0 x 0x2d2 MESH draws and 8 identical frames.
+SEQ=${SEQ:-"w12,k=enter,w60,w10"}
 
 A7VK_AB="0:normal,3020:vcol,3060:normal,3100:vcol,3140:normal" \
 A7VK_SNAP="3010,3030,3050,3070,3090,3110,3130,3150:/tmp/card.ppm" \
@@ -87,5 +91,7 @@ for f in /tmp/card.ppm.*; do
 done
 echo "moved $i frames to $OUT/card/"
 grep -E '\[AB\]' "$LOG" 2>/dev/null | head -8
-grep -E 'draws by FVF|refusedFvf' "$LOG" 2>/dev/null | tail -2
+echo "--- did the stage load? (0x2d2 MESH draws > 0 means yes) ---"
+grep -E "draws by FVF|refusedFvf" "$LOG" 2>/dev/null | tail -2
+if grep -q "0x2d2 MESH=[1-9]" "$LOG" 2>/dev/null; then echo "STAGE REACHED"; else echo "NO STAGE -- these frames cannot show a car; the run is void for this ticket"; fi
 ps -eo pid,args | grep -E '[c]mr2' | grep -v grep || echo "no cmr2 left running"

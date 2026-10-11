@@ -205,3 +205,38 @@ process is still on the box as I write; whoever owns it should reap it.
 * **Not claimed: the "20.5 % pure white" question is answered.** It is untouched here.
 * No source file was edited this round. `work/PLAY/out-plain/cmr2` was not relinked, rebuilt
   or touched: md5 `97a9eb3b08595858a563282596680401` before and after.
+
+---
+
+## 8. The A/B was then ATTEMPTED, twice, and is VOID twice — recorded so nobody re-learns it
+
+The orphan in §6 exited on its own between 08:36 and 08:37 (`ps` at the end of the first
+attempt: *no cmr2 left running*), so `gpu_guard` passed and `run_card.sh` ran.
+
+| attempt | binary it actually ran | outcome |
+|---|---|---|
+| `card_probe` (08:37) | `97a9eb3b…` (his) | `[CENSUS] draws by FVF: 0x1c4 TL=924455` and **no `0x2d2 MESH` at all** — the stage was never reached. 8 frames, all the same static frontend page (white rule, y=269). |
+| `card2` (08:38) | `46ef5576…` (**not** his — see below) | no census FVF line, no stage, 8 frames again identical (white rule, y=329). |
+
+* **Void, both.** A frame that cannot contain a car cannot answer the question. The script now
+  prints `NO STAGE -- … the run is void for this ticket` by itself (it greps for
+  `0x2d2 MESH=[1-9]`); `out/card2.drive.out` carries that line.
+* **The sequence is not what `run_framing.sh` uses.** That calibration is *one* Enter at
+  t=12 s and then leave it alone, and its own captures (frames 3290-4510) are stage frames.
+  `card2` did that and still sat in the frontend at frames 3010-3150. The `death`/`control`
+  runs that DID reach the stage (`out/death2.log`: `0x1c4 TL=1699341 0x2d2 MESH=6344401`)
+  pressed Enter **three** times, at t=14/24/34 s. So the reliable recipe for this ticket is
+  `SEQ="w14,k=enter,w10,k=enter,w10,k=enter,w45"`, and the first-order fix is a
+  **pre-flight stage check**, not more guessing.
+* **The binary moved under the run.** `work/PLAY/out-plain/cmr2` was relinked at 08:38 by the
+  other worker (`cmr2.bak-pre-txttest-20261011` appeared beside it): md5 `97a9eb3b…` →
+  `46ef5576…`. So `card_probe` and `card2` measured two different programs. The second one's
+  frames are NOT frames of the binary the ticket is about.
+* Both runs are otherwise clean: no process left running, `/tmp/card.ppm.*` consumed, and the
+  kernel ledger **12 / 3 / 14 / 3 before and after** (counted with `journalctl -k`).
+
+**Next GPU window, in order:** (1) snapshot the md5 of `out-plain/cmr2` and run against
+**that** — `BIN=` a private copy if the other worker is relinking; (2) `SEQ="w14,k=enter,w10,k=enter,w10,k=enter,w45"`;
+(3) require `0x2d2 MESH` draws before reading any frame; (4) then `run_card.sh cardN` with the
+A/B as specified; (5) then the same frames with `A7VK_OWNER=1` to settle the §3-vs-§7 tension
+(does the untextured 3D draw really own no cells?).
