@@ -1255,3 +1255,47 @@ word and it is done; flagging beats overruling.
 - **The trigger path has three thresholds, not one** — the game's 2 % dead zone, a 4 % pedal
   gate and a 25 % key-mirror threshold. Collapsing them would change EZ, so they were made
   visible and nameable instead. Written up in `docs/CONTROLS.md`.
+
+## 0e. THE MENU CAR IS NOT THE INDEX BASE — the hypothesis is dead, and it is dead by arithmetic. appended 2026-10-11 08:1x EEST by the `MENU-CAR-FLATTENED` worker; nothing above this block was touched
+
+Miami's report was a car in the **pre-race setup menu** that "flattens into one place …
+all mangled and jungled up into one flat piece of paper", and the phone's hypothesis was
+that this screen goes through `DrawIndexedPrimitiveVB` with the **opposite** index
+convention from the race, i.e. that the corrected base (commit `36bec65d`) broke it.
+
+**It did not, and no call site wants the old base.** Measured, not argued:
+
+* `DECK_IDXTRACE=1` over a whole frontend→stage→race run: **40,000 indexed draws with a
+  non-zero base, `rawInRange = 100.00 %` (1,358,988/1,358,988 indices), `usedInRange = 0`,
+  `relOk = 40,000`, `absOk = 0`, `neither = 0`.** The first indexed draws of the run —
+  the first 3D the game draws after a 100 %-2D frontend — are already relative:
+  `startVert=840 numVerts=116 raw[0..115]`, `startVert=1009 numVerts=60 raw[0..59]`.
+* Both index sources in the game are relative to `startVert` by construction:
+  `Mesh_BuildParts` rebases `pData` by `minIndex` and the draw passes
+  `vertexOffset + minIndex` (`Graphics.cpp:7476`); the runs/batches paths pass the
+  mesh-local `vertexIndex` with `vertexOffset` (`Graphics.cpp:7540`, `Game.cpp:2190`).
+  The subtraction was a second re-base in **both**. `Mesh.h:19` says it in the game's own
+  words: *"first vertex used (indices are relative to it)"*.
+* A/B, one variable, same binary, same frame numbers (`A7VK_IDXBASE` unset vs `sub`):
+  the 2D/menu frames move **1.6 %** of their pixels (mean 0.2/255, one box — animation);
+  the stage frames move **90–99 %** (mean 31–49/255). `frames/race2600_idxbase-RAW.png`
+  (920 kB) vs `…-SUB.png` (54 kB) is one frame number, one binary, one env var apart.
+
+**So the corrected base stays the default and nothing in the menu path needs the old
+one.** The order's "do not revert the whole fix" is satisfied by measurement: there is
+nothing to scope, because the corrected path only changes draws that are *impossible* as
+written and none exist.
+
+**What I could not do, said plainly:** photograph the menu car on the current build. On
+this build the attract route goes frontend → stage load → race without stopping at that
+screen, and pressing Esc during the race did not reach it either; the runs that DO show it
+(`owner1`…`owner6`, camera `eye=(0.14 -0.09 -5.00)`, 450/2560 cells, 8 textures, ~2,770
+tris/frame) were runs polluted by a second driver's machine-wide key injection. The
+screen's own numbers are in `docs/MENU-CAR.md` §3: **0 of 2,560 cells nearer than the near
+plane** (the car sits 4.12–4.60 units away against `znear = 1.00`), so the race's
+near-plane blow-up is not this screen's story either. `frames/menu-prerace_before-idxfix_23h09.png`
+is what that screen looked like on the **pre-fix** binary — the eye-side half of the
+question is still open, and it is named as open.
+
+GPU ring timeouts 12 → 12 across nine runs; no window left on his desktop; his binary
+untouched (`b960621bcc5657e135640e35aa70869f`).
