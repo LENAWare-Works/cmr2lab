@@ -650,3 +650,63 @@ Frames pushed with this block: `frames/opt-preview-car_20261011-1440_f3639_ENGIN
 `frames/opt-preview-car_20261011-1440_f3639_CAR-REGION-2x.png` (md5 `24e329061cd9f34fd21005de841e0a3c`),
 both from `md_proj9b` capture 002 = frame 3639, the frame whose engine prediction is the first row
 of the table above. `git push origin HEAD` still fails (no credential helper on this box).
+
+## setup-menu car r10 (2026-10-11 14:4x–15:0x EEST): the per-frame draw ORDER at last, and 96.4 % of that frame is the option menu's own CLEAR COLOUR
+
+`work/MENU-CAR-FLATTENED`, run **`md_cov7`**, card taken at 14:46:02 through the standing guard,
+binary `out-md7/cmr2` md5 `b051924366847f8226094d4dc26e3810`, with the round-7 instruments
+**`LENA_MENUORDER=1 LENA_MENUCOVER=1 LENA_MENUCOVER2=1`** — which no run had ever carried onto
+the option page's 3D window (round 7 built them, ran them on `out-md5` whose MENUCOVER output is
+silently suppressed, and gave up when `md_cov6` never drew the car; every run since used `out-md7`
+and never turned them on).
+
+**What the page does, per frame, measured:**
+
+```
+[MENUORDER]  draws=406 3d=29 first3d=4 last3d=32 2d_after_last3d=374
+[MENUCOVER2] 3d_first=4 3d_last=32 2d_after3d=374 cover2d_after_3d=2
+             first  =(33 [56.0 46.0 987.5 653.5] ffb8b8b8)
+             topmost=(34 [179.0 352.0 1223.5 683.5] ffb8b8b8)
+```
+
+* The car is **29 indexed 3D draws, 4th to 32nd of every frame**, and it is submitted
+  continuously (the `[MENUORDER]` 400-frame budget all fired with `3d=29`).
+* **374 2D draws come after it**, and the first two are big opaque quads covering its whole
+  footprint. Their vertex colour fades per frame (cc→b8→b2→ab→d9→ee→f6→fe…→ff): a page fade.
+* **And the frame they are drawn on is 96.38 % ONE colour: (140,150,158).** That colour is the
+  **option menu's own clear colour** — `GameInfo.cpp:1788` `SetClearColour(1, 0x8d, 0x97, 0x9f)`
+  = (141,151,159), one code off (measured on the pixel). The only other content inside the car's
+  own rect x160..1080 y280..560 is **9.85 %** of pixels, and its two commonest colours are pure
+  white (255,255,255) and pure black (0,0,0) — **menu text**, on a panel so flat that the mean
+  horizontal gradient there is **0.00** (against 22.28 inside the text). **The page is almost
+  entirely UNPAINTED: the car's 29 draws, and everything else that should fill that screen, leave
+  no marks on it.**
+
+**So the r7 question — "who paints over the car" — was asked properly and answered NO.**
+`LENA_MENUSKIP2D` (new, `patch_menuskip.py`, built into `out-md8/cmr2` md5
+`fe0c82daa709e6fa5486f9c230c15df3`) drops every 2D/TL draw whose bbox contains (640,420) while
+`/tmp/skipnow` exists, in frames that have already submitted a 3D draw. Run `md_skip` took the
+card at 14:55:35 and did it as a triggered same-run A/B: 10 s control → `touch /tmp/skipnow`
+14 s → remove 8 s, captures every 0.4 s throughout. The port's own log names what it dropped:
+`count=72 quads=18` per frame, twice per frame, `sz0=0.0000 rhw0=0.0000`. **The frames before,
+during and after are the same file: md5 `40fd7369f33caaa7a303b1d5f7c24748`** — and that is also
+the md5 of `md_cov7`'s captures from 10 onward, a different binary in a different run. Dropping
+the covering draws changes **nothing**; the car is not hidden by 2D chrome.
+
+**Frames pushed with this block.**
+`frames/opt-preview-page_20261011-1500_r10_car-submitted-29-draws_INVISIBLE.png` (md5
+`03ac7eca08fbe2d32ddf94abd27f7c52`) — the whole option frame with the car's 29 draws in flight:
+menu text on the clear colour, no car. `frames/opt-preview-page_20261011-1500_r10_CAR-RECT_what-is-really-there.png`
+(md5 `bcfaf0ee568973804674a9038b3ecfbc`) — the car's own owner rect x160..1080 y280..560 cut out
+and shown on its own, so the absence is visible without hunting for it.
+
+**What did NOT move: the car is still not on that frame and no fix is claimed.** Three mechanisms
+are now excluded by measurement *on this page*: the index base (r5), culling (r8), alpha (r6),
+the 2D draw order (r10). What r10 adds is the reason the previous rounds kept disagreeing with
+themselves — **the frame is not a wrong picture of the car, it is an EMPTY one: the car's draws,
+and the page's own fill, are not reaching the rasteriser at all.** The next instrument is
+therefore not another state readout but a *drop test on the 3D path* (submit none of the 29 draws
+and compare the frame: if it is byte-identical, the car's draws contribute zero pixels on this
+page and the fault is in the 3D submit/raster path, not in composition) — `LENA_MENUSKIP2D`'s
+twin, ten lines away in the same file. `git push origin HEAD` still fails on this box (no
+credential helper); the commit is local.
