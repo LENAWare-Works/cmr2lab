@@ -560,3 +560,328 @@ the cheapest thing anyone can give me and it is the first thing I would ask for.
 Nothing of worker 1's or worker 2's was modified. No source edited, no binary built or
 copied, no run started, no window on his desktop. Kernel ledger unmoved at
 `gfx_0.0.0 timeout = 12`; the two `gfx_0.1.0` + `MODE2` events are the 07:25/07:31 pair.
+
+---
+
+# ROUND 3 ADDENDUM — `MENU-CAR-EVIDENCE-VISION`, 2026-10-11 09:2x–09:5x EEST
+
+Round 3 got **no GPU run of its own** (the card was the peer's `out-md2/cmr2` for the whole
+round; `gpu-guard.sh --list` read `899595 owned` at 09:22 and empty from 09:25). What follows
+is measured **off the peer's own run** — `work/MENU-CAR-FLATTENED/out/md_raw.log` (5 MB, 66,664
+lines), its 7 captures `frames/md_raw.000-006.ppm`, and `~/.lena_cmr2/port/rhi/` — read only,
+nothing started, nothing built, nothing of theirs touched.
+
+## 17. THE `raw` ARM RAN — AND IT IS THE FIRST REAL PER-DRAW DECODE OF A MESH SCREEN
+
+`run_md.sh md_raw` (raw = the shipped, corrected default) finished 09:24:17, rc=0, ring
+timeouts `12 before / 12 after` (no wedge). It produced **7 bursts of 1,500 indexed 3D draws**
+and **7 captures**, at frames **8264, 9125, 10006, 10881, 11757, 12626, 13499**.
+
+**17.1 The draw census — 4,661 logged draws, and they are 214 frames of the same 7 meshes.**
+Every logged draw is `fvf=0x2d2 stride=48 vb=0x17429a0 bytes=96000` — one 2,000-vertex buffer.
+The draws repeat in a fixed cycle of **seven** `(startVert, numVerts)` meshes, ~214 times per
+burst (`md_log_stats.py`, written this round, reads the log; no GPU needed):
+
+| startVert | numVerts | draws | md_decode | object-space extent (float48) | idx[0..5] |
+|---|---|---|---|---|---|
+| 1532 | 116 | 215 | SOLID | 160 × 57.82 × 160 | 2,1,0,1,2,3 |
+| 1648 |   9 | 215 | PLANAR | 200 × 0 × 200 | 2,1,0,4,2,3 |
+| 1657 |   4 | 214 | PLANAR | 200 × 0 × 200 | 2,1,0,3,0,1 |
+| 1669 |  32 | 214 | SOLID | 160 × 65.68 × 160 | 2,1,0,0,1,3 |
+| 1685 |  16 | 214 | SOLID | 160 × 65.68 × 160 | 2,1,0,0,1,3 |
+| 1701 |  60 | 214 | SOLID | 160 × 65.57 × 160 | 2,1,0,0,1,3 |
+| 1713 |  48 | 214 | SOLID | 160 × 65.57 × 160 | 2,1,0,0,1,3 |
+
+**17.2 The measurement §12a was written to wait for, and it came out against C.**
+`float48` — the same bytes the draw read, decoded as 48-byte IEEE float — is **non-degenerate,
+finite, and constant across all 214 frames** (`nonfinite=0` on every line). The 16.16 decode of
+those bytes (`fixed48`) and the 32-byte-stride packed decode (`fixed32`) are both nonsense
+(±1.5e4 … ±2.6e4 where the float reading is ±80 … ±100). **So on these draws the vertex array
+really is the 48-byte float layout: candidate C (32-byte 16.16 read as 48-byte float) is REFUTED
+here, and candidate B (the preview's own deform collapsing vertices into one place) is refuted
+too** — the positions span 160 × 58 × 160 units, they are not collapsed. §12a's "if float48 is
+degenerate and fixed48 is car-shaped then C" did **not** fire. C is dead on this screen; B
+survives only as something the vertex *data* cannot see.
+
+**17.3 The index-base question, answered from the same log — and it inverts the A/B's premise.**
+All 4,661 draws are `zeroBase=no` (`startVert ≠ 0`), so per the instrument's own definition
+**every one of them is a draw the `A7VK_IDXBASE` switch CAN change** — the cheap per-draw test
+the peer built for exactly this. And `idxInRange=yes` on all of them, with **every index ≤ 200
+across all 10,500 sampled draws** while `startVert` is 1532–1713 and `numVerts` 4–116. The
+indices are therefore **relative to `startVert`**, not absolute into the buffer — which is what
+`36bec65d` found over 404,000 draws and it is true on this screen as well. Under the raw default
+`vertex = startVert + idx` lands on the mesh, and the instrument reads a car-shaped box there.
+Under `sub` the port computes `idxScratch[i] = (uint16_t)(idx[i] - startVert)` (deck_dd7.cpp:1591),
+i.e. `2 − 1532 → 64,506`, and hands **that** to the backend as a vertex index.
+
+**17.4 A warning about the other arm, because it reads outside the window it owns.**
+The draw path copies `vcount` vertices into a 24 MB arena and copies the indices **verbatim**
+(`a7_vk32.c:2437-2460`); only the *copy cursors* are clamped (`a7_vk32.c:2443`), and **index
+values are never validated against `vcount`** — the three `a >= vcount` checks in that file
+(1717, 1856, 2200) are all inside the trace/owner instrumentation, not the draw. So the `sub`
+arm does not draw a differently-based car on these draws; it makes every index of every draw
+point ~3.07 MB (64,506 × 48 B) past its own mesh, into an arena whose contents are whatever the
+last frames left there. That is normally wrong-triangles rather than a fault (24 MB arena), but
+it is an **unvalidated read taken on his card**, the same class as the read that wedged his
+display at 07:25 (different client — texture, not vertex). My reading, not an instruction:
+**run the `sub` arm only with the kernel ledger and `gpu-guard` watching, and do not be
+surprised if it neither fixes nor cleanly explains anything** — on the draws measured here, `sub`
+is refuted by arithmetic before it is refuted by pixels.
+
+**17.5 The pictures do not contain her patch — for the third run in a row.**
+Her defect is not in `md_raw.000-006.ppm`: 31,117–33,416 **distinct colours** per frame with the
+top colour at 0.62 %, **zero** pixels with `r>110, r−g>55` (no orange/red at all), no flat
+unshaded hard-edged cluster, and two captures 800 frames apart differ **only in the top 336
+rows** — the lower scene is pixel-identical, so nothing at the centre is sharding. Her patch
+sits "just below vertical centre, roughly on the horizontal centre line" at 10–15 % of the
+frame; that region is a smooth texture with no hard edges in any of the seven frames.
+
+**17.6 WHY THEY MISSED THE SCREEN — the trigger's own latency, and it is a bug in the driver.**
+The last `[OWNER] cam` line before **every** capture is `eye=(-0.00 -0.00 -0.00) fwd=(0,0,1)`,
+`zfar=200`, frame depth p10=26.66 p50=32.83 p90=63.21, 100 % of cells owned by 9 road/ground
+textures, 473 tris. The option camera `eye=(0.14 -0.09 -5.00)` appears 16 times — at frames
+**7675–7725**, i.e. ~6 s and ~500 frames *before* the first burst, when the screen was **0/2560
+cells owned, 0 tris drawn**. So the bursts fired on the screen the game moved on to, not on the
+one the driver stopped on. The cause is in `md_drive.py`, and it is visible in its own output:
+it arms `next_burst = el + 1.0` when it first sees the camera line, but its loop prints are
+**6.7 s apart** (`[132.4] … SEEN`, `[139.1] BURST 1`, `[145.8] nudge`, `[154.0] BURST 2`)
+because every iteration runs `log_text()` over the whole growing 5 MB log **and** a full
+`gpu-guard.sh --foreign` subprocess (md_drive.py:100-139), so the "1 second" delay is really
+6.7 s and the option screen is gone by the time `/tmp/mdnow` is touched. Fix before the next run:
+throttle `competing()` to every ~10 s and read only the log's last N KB — then the burst lands
+within one loop of the camera line, where the car actually is.
+
+**17.7 Her optional text item: no new evidence, and I am not going to manufacture any.**
+§10 stands (text draws on at least one page of this menu on a pre-fix build, measured as 1-px
+antialiased strokes; her photographed build was 78 minutes older than the `int`→`void` fix).
+The round-3 frames do show static white in a right-hand strip `x[876..1264] y[50..789]`
+(6,306 px, identical count in all 7) — that is a UI element in the frame, but these are not her
+screen and I cannot tell a plate from a glyph in them, so it changes nothing. The discriminating
+run is still the one §10 named: reach the page she photographed on the current build and look.
+
+**17.8 What to do next, in order.** (1) Fix `md_drive.py`'s loop as in 17.6 — without it the
+next run misses again. (2) Re-run **raw** and confirm the burst frame contains the option camera
+and non-zero `owner map` cells. (3) Only then the `A7VK_IDXBASE` A/B, watching
+`journalctl -k | grep 'ring gfx_0.0.0 timeout'` before/after. (4) Ask her for the two photo
+timestamps (§13) — still free, still unanswered, and now the only thing that can tie her patch
+to a build.
+
+**17.9 What I did on disk this round.** `work/RACE/md_log_stats.py` (new: reads a `[MENUDRAW]`
+log, classifies every draw, needs no GPU). Nothing else written, nothing run, no source edited,
+no binary built, no window opened, no peer file modified. Kernel ledger untouched.
+
+**17.6a THE 6.7 SECONDS, MEASURED.** `sh gpu-guard.sh --foreign` takes **4.53 s** on this box
+(timed at 09:5x); `log_text()` over the 5 MB log takes 0.01 s. `md_drive.py` calls *both* every
+loop iteration, so its nominal `time.sleep(0.5)` loop is really a **4.5–8.5 s** loop — which is
+exactly the spacing of its own output (keys 8.4 s apart with `HUNT_EVERY=5`; `BURST 1` 6.7 s
+after the arm that scheduled it 1.0 s out). That is the whole of 17.6: not the game, not the
+log, the guard poll.
+
+---
+
+# §18 ONWARD — ROUND 4 (2026-10-11 10:0x EEST): THE A/B, RUN AT LAST, ON BOTH ARMS, INSIDE THEIR OWN WINDOWS
+
+Round 3 and the peer ticket both ended with the same sentence: *the A/B has not been run
+because no run that reached the option screen also carried the trace.* That is no longer
+true. The peer's run `md_geo` (launched 09:57, shipped default, `A7VK_OWNER=1` +
+`A7VK_GEOTRACE=1`) **reached the option screen and held it**, and two earlier runs
+(`md_raw` 09:22, `md_sub4` 09:48) did too. All three logs are on disk. I re-read them
+inside their own windows instead of by frame number, and the discriminating test the phone
+asked for now has an answer **in both directions**.
+
+**Method (this is the whole of it):** the setup/option screen is the unique screen whose
+camera is `eye=(0.14 -0.09 -5.00)`. For each run I take the frame range in which that
+camera line is present, and read the per-frame owner-map coverage **only inside that
+range**. `A7VK_OWNER` prints coverage, triangle count and texture count once per 25 frames;
+the coverage number is the fraction of the frame's 64×40 cells that any 3D triangle
+actually reached during that present. Nothing else is used.
+
+## §18.1 THE MEASUREMENT
+
+| run | arm | option-screen window (frames) | best in-window coverage | tris | 3D textures | bbox of the covered cells |
+|---|---|---|---|---|---|---|
+| `md_raw` | **raw = shipped default** | 7675 → 8050 | **599/2560 = 23.4 %** (f 7900) | 2,099 | 8 | x[180..1020] y[260..580] → **65.6 % W × 40.0 % H**, centre (46.9 %, 52.5 %) |
+| `md_geo` | **raw = shipped default** | 3350 → 3525 | **595/2560 = 23.2 %** (f 3450) | 2,073 | 8 | x[120..1080] y[220..560] → **75.0 % W × 42.5 % H**, centre (46.9 %, 48.8 %) |
+| `md_sub4` | **sub = old re-base** | 6650 → 7225 | **28/2560 = 1.1 %** (f 6950) | **48** | 8 | x[760..900] y[320..400] → **10.9 % W × 10.0 % H**, centre (64.8 %, 45.0 %) |
+
+* **Two independent raw runs, three runs apart in wall-clock and different frame numbers,
+  agree to 0.2 % of frame area and to 26 triangles on ~2,080** (23.4 % / 23.2 %,
+  2,099 / 2,073). The default's picture of that screen is stable and reproducible.
+* **`sub` is not a variation of it. It is a factor of ~21 down in covered area and ~43
+  down in triangles** — 48 triangles is the whole car.
+* All three arms bind the **same 8 car textures** on that screen (the `CML*` Lancer
+  liveries that load immediately before it, `md_geo.log` 1900–1930). So the difference is
+  not texture starvation and not missing parts: the same parts are asked for and 8 of them
+  bind in both arms.
+* The raw arm's cell map is **car-shaped** — two symmetric textured masses left and right
+  (wheels) around a wide body, centred on the frame's horizontal middle, sitting across
+  the vertical middle (`md_raw` f7900 and `md_geo` f3450 both, reproduced in §18.2). The
+  `sub` arm's cell map is a **single featureless block of one texture family** in the
+  lower right of centre.
+
+## §18.2 THE TWO MAPS, SIDE BY SIDE (same screen, same camera, same 64×40 grid)
+
+```
+raw  (md_geo f3450)  75.0% W x 42.5% H          sub  (md_sub4 f6950)  10.9% W x 10.0% H
+ |              BBBBBBBB   BBBBBBBB     |        |                                |
+ |             BBBBBBBBB   BBBBBBBB     |        |                                |
+ |             BBBBBAAAAAAAAAAAAABBBBBA |        |                                |
+ |       AAEEAEEBBBBBBAAAAAAABBBBBBBAAA |        |                                |
+ |       AAAAEEEEEBBAAAAAAAAAAABBBBAABAA |        |                                |
+ |       AAEEAAAAAAAAAAAAAAAAAAAAAAAAAAA |        |                                |
+ |       AAAAAAAAAAAACCCCCDDDDDDDAAADDAA |        |          AAAAAAA               |
+ |       AAAAAAACCCDCCCCCCCCCCDDDDDCDDDD |        |          AAAAAAA               |
+ |       AAAAAADCCCCDCCCCCCCCDDDDDCDDCCA |        |          AAAAAAA               |
+ |      AAAAAAACDDCCCDCCCCDDDDCCCCDDDDCD |        |          AAAAAAA               |
+```
+(`A` = texId 40, `B` = 42, `C` = 43/45, `D` = 45, `E` = 41/46 — eight livery textures,
+2,073 tris on the left, 48 on the right.)
+
+### §18.3 CREDIT, AND WHAT IS ACTUALLY NEW HERE
+
+Checked against the lab repo before writing this: the commit `229c886` (09:52, the
+`MENU-CAR-FLATTENED` worker) already carries the line
+*"option-camera coverage: 599 / 591 / 450 cells = 23.4 / 23.1 / 17.6 % vs 0/2560 cells in
+21 dumps, at most 28/2560 = 1.1 %"*. **The coverage A/B is theirs, and it is right.** What
+this round adds on top of it is:
+
+1. **the window-scoping method stated and applied** — a coverage number is only about that
+   screen if it was taken while that screen's camera was up, and it lets their three
+   numbers (23.4 / 23.1 / 17.6 %) be read as one stable picture plus two partial ones;
+2. **the bbox in % of frame** — 10.9 % W × 10.0 % H — which is the number that meets the
+   phone's own estimate and is what turns "1.1 %" into "that is her patch";
+3. **the capture audit** (1 of 41 captures inside its own window, and that one 48 frames
+   too late), which voids §0g's "no car in the default frame";
+4. **the GEOTRACE frame** (§19) and **the environment audit** (§22).
+
+Nothing above is a correction of their conclusion — their commit reaches the same one
+("the old re-base kills the car"). It is a correction of §0g's *picture* claim and of
+§16's control, and it supplies the number that answers the phone.
+
+## §19. THE RAW ARM'S MENU FRAME, IN THE GAME'S OWN MATRICES AND BOXES
+
+`md_geo` frame 3480 is the only captured moment in this project's history where the
+**option screen and `A7VK_GEOTRACE` were on at the same time**. Everything below is one
+frame, printed by the port itself:
+
+```
+[GEO] f=3480 | 3D draws=1836 verts=104244 tex=1836 notex=0 lit=1768 | TL draws=19691 verts=96602
+[GEO]   obj  x=[-2.1 2.1] y=[-0.5 0.7] z=[-0.9 0.9]
+[GEO]   w=[4.076 6.158] ndc x=[-0.811 0.741] y=[-0.422 0.459] z=[0.758 0.841]
+        behind=0 nonfinite=0 draw_behind=0 draw_alloff=0
+[GT2]   WORLD identity; VIEW rigid orthonormal t=(-0.140 0.090 5.000);
+        PROJ xscale=1.5185 yscale=2.0985 znear=1.0 zfar=250.0
+[GT2]   coverage: tri_full=140964 part=0 behind=0 screens_covered=194.398
+```
+
+Read against the phone's five constraints, on the arm she proposed to reject:
+
+| her constraint | what the default build actually does on that screen |
+|---|---|
+| small patch, not spread | **no** — object-space box is **4.2 × 1.2 × 1.8 world units**, a car, and its NDC box is x[-0.81..0.74] y[-0.42..0.46], i.e. it spans most of the frame |
+| jagged shards, nothing smooth | **no** — `part=0` (not one triangle straddles the viewport edge), `0` behind the eye, `nonfinite=0` |
+| colours are the car's own livery | **yes, and it is the same set on both arms** (8 `CML*` textures) — so this observation of hers does not discriminate, exactly as §2 said |
+| no silhouette, no perspective | **no** — the covered cells form wheels-plus-body; the box is affine and 4.2 units long against 1.8 wide |
+| nothing stretched off-screen | **yes — but as a measured zero, not as a symptom**: `draw_alloff=0 draw_behind=0` |
+
+**The frame she says she is looking at is not what the default build produces on that
+screen.** The nearest thing to her description that this project has ever measured is the
+`sub` arm.
+
+## §20. HER PATCH IS THE `sub` SIGNATURE — AND THAT INVERTS HER READING
+
+Her measurements: *"roughly 10–15 % of screen width and height, sitting just below
+vertical centre, roughly on the horizontal centre line … jagged, ragged-edged shards …
+flat unshaded colour … the colours inside the patch are the car's own livery … nothing
+smooth, no gradients, no shading."*
+
+| her number | `sub` measured | verdict |
+|---|---|---|
+| 10–15 % of width | **10.9 %** (x 760→900 = 140 px) | matches |
+| 10–15 % of height | **10.0 %** (f 6950) / **5.0 %** (f 6925, 6975) | matches at the top of her range |
+| 1–2.25 % of frame area | **1.1 %** (28/2560 cells) | matches |
+| car's own livery, several flat colours | 8 `CML*` livery textures bound; the patch carries 3 different car parts (`A`,`B`,`C`) inside one block | matches |
+| sitting below vertical centre | cell centre y **67.5 %** at f6925/f6975 | matches |
+| on the horizontal centre line | cell centre x **64.8–66.4 %** across | **does not match** — the patch is right of centre, not on it |
+| no long triangles, none off-screen | 48 triangles inside 28 cells; nothing outside | consistent |
+
+**So the test she asked for comes back negative, and worse than negative: the old re-base
+is not what the menu path is missing — the old re-base is what *makes* the patch.**
+`A7VK_IDXBASE=sub` on this screen is not a repair, it is the defect, and scoping it to the
+menu draw path would install her photo onto Miami's screen. The default (corrected) base
+stays. That is the answer to the only question this ticket was ever about.
+
+One honest caveat, in the same breath: her position reading (centre line) and mine
+(64.8–66.4 % across) disagree, and her photo is still not on this machine, so what she
+photographed has not been *identified* — only its *shape and size* have been matched to an
+arm. §22 says what would settle it, and it needs no new instrument.
+
+## §21. WHY NO RUN IN THIS TICKET EVER PHOTOGRAPHED THAT SCREEN — COUNTED, NOT SUSPECTED
+
+| run | option-screen window | captures | captures **inside** the window |
+|---|---|---|---|
+| `md_raw` | 7675 → 8050 | 7 (8264, 9125, 10006, 10881, 11757, 12626, 13499) | **0** |
+| `md_geo` | 3350 → 3525 | 19 (3955 … 15857) | **0** |
+| `md_sub4` | 6650 → 7225 | 15 (7023, 7720, …, 16609) | **1** — frame 7023 |
+
+* **`md_raw`'s "the default run's frame has no car" is a capture-timing artefact.** Its
+  window closed at 8050 and its first capture is 8264, 214 frames later. That picture is
+  not of the setup screen at all.
+* `md_raw.000.ppm` (frame 8264) measures **31,117 distinct colours** — a busy screen, not
+  the option screen and not a flat one.
+* **The one in-window capture is not of the car either.** `md_sub4.000.ppm` is frame 7023;
+  the `sub` arm's 3D on that screen exists at owner samples 6925 / 6950 / 6975 and is
+  **gone by 7023**. Measured on the pixels: **33 distinct colours, 99.233 % `#8c959e`** —
+  the nearly-flat frame the peer published as `…_IDXBASE-sub_FLAT.png`. True of the
+  picture, and it says nothing about the arm.
+* The car's own 3D is present for only **2–3 owner samples (~50–100 frames, 1–2 s at this
+  build's frame rate) per window, in every arm.** A capture has to be aimed inside that
+  1–2 s window; a fixed cadence that fires ~9 s after the camera line appears cannot be.
+  This is the same latency failure round 3 diagnosed in `md_drive.py:139`, and it is still
+  the binding constraint on this ticket — not instrument coverage.
+* The windows are at **different frame numbers in different runs** (7675 vs 3350 vs 6650).
+  Any A/B that pairs captures **by frame number across runs** is comparing different
+  states of a screen that animates. All of §3's "the bbox is identical in every
+  comparison" used such pairs; the bbox agreement is a property of the loading/frontend
+  element both runs were showing, not of the menu.
+
+## §22. IS MIAMI'S BUILD RUNNING `sub`? — NO, AND HERE IS EVERY PLACE IT COULD BE
+
+* **Source:** `deck_dd7.cpp:1417–1424` — `ib_raw` defaults to `1` (corrected); the old
+  re-base is selected only when `A7VK_IDXBASE` is present **and its first character is
+  `s`**. Unset = corrected. (`patch_idxfix.py`'s own docstring still documents the *old*
+  polarity, "unset → subtract"; that is stale text from before the default was flipped at
+  04:2x and I am flagging it rather than editing the peer's file.)
+* **His environment:** no `A7VK_IDXBASE` in `.bashrc`, `.profile`, `.bash_profile`, or
+  `.config/environment.d/`; `systemctl --user show-environment` is clean; no live process
+  on this box carries it.
+* **His binary:** `work/PLAY/out-plain/cmr2` = md5 `d26a09231a98ebb25b6da8b664275f87`,
+  08:53 today — relinked by the death lane, **not by me**, and built from a tree whose
+  default is the corrected base.
+
+**So her photo is one of two things, and the cheap test separates them:** either it is
+older than the 04:2x default flip, or the screen she photographed is not this screen.
+The test is one capture of the current default menu frame with the burst armed to fire
+*while the car is up* (aim inside the 1–2 s window, e.g. arm on the camera line and fire
+within 0.5 s, or trigger on the first 3D draw rather than on a clock). That single frame
+is now the only thing this ticket is missing.
+
+## §23. THE TEXT ITEM — UNCHANGED, PLUS ONE FREE CONFIRMATION
+
+§5 stands: atlases load on both screens, `Font_DrawText → … → DrawPrimitive(TLVERTEX)` is
+implemented and exercised 1.66–1.87 M times per run, so "no text" cannot be a missing
+path. One extra line from the round-4 frame: **on the option screen itself the 2D/TL path
+is busy — `TL draws=19691 verts=96602` in the single frame 3480.** If her photo really has
+no text, it is not because that path is idle at that moment. Still unverified, still not
+worth a run, and still answered by the same one capture as §22.
+
+## §24. WHAT I DID NOT DO
+
+* **No GPU run, no window, no rebuild, no source edit, no peer file modified.** The card
+  was held by the peer's `md_geo` run for the whole round, and from 10:03 by the death
+  lane's `PLAY/out-plain/cmr2` (pid 2145161). Nothing was killed and nothing is left
+  running by me.
+* **I did not get her photos** (§6, unchanged) — so §20's match is a match of *shape and
+  size*, not an identification of the image.
+* **The death ticket stayed first**: the card went straight from `md_geo` to the death
+  lane, and I did not contend for it.
