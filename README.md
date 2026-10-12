@@ -31,6 +31,11 @@ game process, no GPU).
 >
 > Then come back here — the rest of this page is the detail behind those three.
 
+> **Just want to LOOK at the game?** → **[`frames/README.md`](frames/README.md)** — every frame
+> published so far, full-size 1280×800 PNG, no downscale: the 09:27 build he called
+> *"amazing"* next to tonight's, plus frames of his own live session. Open them directly;
+> nothing there is a mock-up.
+
 ---
 
 > **12 October 2026.** The game boots its own frontend, loads a real Kenya stage off

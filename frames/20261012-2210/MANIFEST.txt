@@ -2,6 +2,7 @@
 c405013a28e0118f0c6176ea2f53e4d7  A-tonight-mainmenu-f2600.png
 ad094d2f4a2464f84160f65104d58e5a  A-tonight-raceentry-f5000.png
 26f669def1f0b026cd0abc3d95b89c3e  A-tonight-race-f6000.png
+542b102b20feb92a9a3ba156639fc722  A-tonight-race-f5000-fxd.png
 bad1910dac8c8bb3edcd77070ed44108  A-tonight-setupmenu-f4000.png
 8ed098bc90ca3715b42110dda1d3fe45  B-0927-demo-f3000.png
 1999ed4ae4ef91ea35e9dfcae38a2793  B-0927-demo-f3500.png
