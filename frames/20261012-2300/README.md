@@ -1,38 +1,42 @@
-# frames/20261012-2300 — the stage-load crash, its fix, and his own session
+# frames/20261012-2300 — the stage-load crash, its four fixes, and his own session
 
-Published 2026-10-12 ~23:00 by the round `SUSPECT-CORRECTED-THE-ALIGN-20261012-2218`.
-Full size, 1280x800, no crop, no downscale. `MANIFEST.txt` has the md5 and byte size of
-every file and nothing is re-encoded.
+Published 2026-10-12 ~23:35 by the round `SUSPECT-CORRECTED-THE-ALIGN-20261012-2218`.
+Full size, 1280x800, no crop, no re-encode. `MANIFEST.txt` carries the md5 and size of
+every file.
 
-## The three frames
+## The six frames
 
 | file | what it is |
 |---|---|
-| `tree-fixed-f2600.png` | **frame 2600 of a build made from the fixed tree** — the first tree build that ever got past the record-map crash. 586,844 draws / 1,210,912 triangles had already gone to the GPU on this frame. It is a *build* frame, not a run: the build died 114 frames later, in a **second** defect behind the first (see below). |
-| `miami-session-225134.png` | **Miami's own session**, 22:51:34, from the eyes loop. He pressed the Desktop icon at 22:46:38 and this is him in a stage: leaderboard top-left (`2 ERIKSON 01:57.21`, `3 AAA 01:57.63`), turn arrow top-centre, timer + progress bar top-right, tachometer bottom-right. |
-| `miami-session-225944.png` | the same session, 22:59:44 — still alive, still in a stage. By 23:00 the process had been up ~14 minutes with no fatal signal, on build `94ed1359c405`. |
+| `tree-fixed-f2600.png` | frame 2600 (Main Menu) of the **first tree build** to get past the record-map crash — 586,844 draws in, then it died in a second defect |
+| `tree-build-stage-f3200.png` | **the tree build driving a stage** — attract demo, frame 3200, after 788,352 draws / 3,864,576 triangles, `clampHits=0`. The "demo" label is the attract route, which draws no HUD |
+| `tree-build-stage-f4500.png` | same build, frame 4500: 1,192,719 draws / 11,552,344 triangles, still `clampHits=0` |
+| `miami-session-225134.png` | **Miami's own session**, 22:51:34, from the eyes loop: leaderboard (`2 ERIKSON 01:57.21`, `3 AAA 01:57.63`), turn arrow, timer, tachometer |
+| `miami-session-225944.png` | the same session, 22:59:44 — process up 17 minutes, no fatal signal, build `94ed1359c405` |
+| `menu-diff-vs-his-build.png` | the **amplified pixel difference** between his build's Main Menu and the tree build's, at the same frame. It is the animated letter-ribbon's phase and nothing else — same title, same clock, same menu bar — which is what makes the tree build's frontend trustworthy without a GPU run |
 
-These are **the first frames ever published from a game he is actually playing** rather than
-from a harness run. They are of the game screen only. If he would rather they were not in a
-public repo, delete this directory and say so — nothing else refers to them.
+These are the first frames published from a game he is actually playing, and the first from
+a tree build that reaches a stage *and drives through it*. They are of the game screen only.
+If he would rather his session frames were not in a public repo, delete those two and say so.
 
-## What the frames do and do not prove
+## What the frames prove, and what they do not
 
-**Prove:** a stage loads and renders, the HUD is live, the game survives past stage entry
-(14 minutes and counting), and the near-clip + mips + per-draw TL align are all in the build
-he is on.
+**Prove:** the record-map bug is gone from the binary; a build of the tree loads a stage,
+renders it and drives (2,078 race frames, 1,969 in `state=8`, 11.5 M triangles, `clamps=0`,
+ring-timeout delta 0, no kernel GPU event); his session on the older binary is healthy for
+17 minutes; the tree build's menu is the same picture as his.
 
-**Do not prove:** that the tree is fixed. The tree build in `tree-fixed-f2600.png` is not the
-build in his session, and it did not finish its run.
+**Do not prove:** that the tree is ready to install. **It is not.** That same 200 s run died
+at *stage end* — SIGSEGV in `StageObject_FreeAll` (`Mesh.cpp:416`) under
+`RallyData_FreeChallengeSceneObjects` → `CGame::UnwindCallbacks` → `Race_ReleaseFrameResources`
+→ `Race_HandleStageReplayViewTransitions`. That is the fifth defect tonight and it is why
+`out-plain/cmr2` was **not** replaced: he stays on `94ed1359c405`, which is verified.
 
-**The rendering defects are visible in his frames and they are real, not compression:**
-long white horizontal smears across the road and terrain on the right, and the bottom third
-of the frame carrying a separate dark forest texture that does not connect to the road above
-it. The car reads as a flattened dark mass. All three are present **with the near-clip ON**.
-**A clip-OFF control has never been run**, so this set claims neither that the clip causes
-them nor that it would cure them. That control is the named next experiment.
+**The rendering defects are not tonight's bug, and they are in both builds:** long white
+horizontal smears across the grass, star-shaped white polygon shards, the car flattened, and
+a detached dark band along the very bottom edge — identical in his frames and in the tree
+build's. The near-clip is ON in all of them, and **a clip-OFF control has never been run**, so
+these frames claim neither that the clip causes them nor that it would cure them.
 
-Two stills eight minutes apart (`22:51:34` and `22:59:44`) both read **`KMH 000`**. That may
-be him parked, paused, or at a start line — a still cannot tell. It is flagged here rather
-than interpreted, because if his car will not move it is a different bug from any in this
-directory.
+Two of his stills, eight minutes apart, read `KMH 000`. Parked, paused or start line — a
+still cannot say, and it is flagged rather than interpreted.
