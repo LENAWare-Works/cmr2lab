@@ -285,7 +285,7 @@ on the front door is a car.
   `sweep-after-x86_64`, `sweep-after-i386`, `sweep-demo`), **40 MB**, logs and objects.
   No frames, no shots, so `round-close.sh` does not apply. The scratch copy of the tree
   used to prove the patch is **deleted**; `tools/fixes/patch_ptrwidth_tier1.py` recreates it.
-* Backups: 20 files, `*.bak-pre-ptrwidth-20261012`, alongside the sources they came from.
+* Backups: **19 files**, `*.bak-pre-ptrwidth-20261012`, alongside the sources they came from (2 headers + the 14 files carrying the call shape + 3 one-site files).
 * Disk: `/home` **36 G free, 97 %** — unchanged tonight, nothing reclaimed, nothing outside
   `~/lena` deleted. The frame that matters: this is his disk filling for his reasons, and
   dedup is hygiene, not a rescue.
