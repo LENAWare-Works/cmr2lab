@@ -45,11 +45,14 @@ This project is the other route: **change the game so it speaks Linux directly.*
 
 That is a big job and it is going well. The game's source code has been recovered from
 the shipped `.exe` — 122 files, 135,805 lines of C++ — and more than half of it compiles
-natively on a Steam Deck (**37 of 66 translation units on x86_64, 66 of 66 on 32-bit**;
+natively on a Steam Deck (**54 of 66 translation units on x86_64, 66 of 66 on 32-bit**;
 compile-level counts, and this repo labels them as such, because there is still no
 runtime proof of the port's correctness). The x86_64 figure was **33 at the start of
-12 October and 37 by the end of it** — four files, 320 sites, one afternoon, every edit
-named in [`tools/fixes/patch_ptrwidth_tier1.py`](tools/fixes/patch_ptrwidth_tier1.py).
+12 October and 54 by the end of it** — 21 files, and the sites it is counted in fell from
+1,377 to 385. Every edit is named in a script, stage by stage:
+[`tools/fixes/patch_ptrwidth_tier1.py`](tools/fixes/patch_ptrwidth_tier1.py) for the first
+pass, and `tools/fixes/patch_ptrwidth_tier2_s1.py` … `…_s4.py` for tonight's — driven by
+the compiler's own `(file, line, column)` list, never by a regex over a file.
 
 It also draws, and that sentence has to be exact. The game's data files produce a real
 car, rendered on a Deck through Vulkan — but the **data** is the game's and the **draw
@@ -95,8 +98,8 @@ public rather than deleted (`docs/ROAD-TEXTURE-OWNER.md` §3 and
 | **A car you can actually drive** | ⚠️ **Yes again since 11 Oct 11:02** — our own tool had broken it for 2½ hours | `docs/DRIVE-LOOP-REGRESSION.md` |
 | **Lighting that looks like the original** | ❌ No — the road's per-vertex shading is dropped | `docs/ROAD-r6-REPORT.md` |
 | **The car in the setup screen** | ❌ No — it renders collapsed | `docs/MENU-CAR-EVIDENCE.md` |
-| **More than half the game's code compiling for Linux** | ✅ 37 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
-| **The rest compiling** | ❌ Not yet — pointer-width work, 1,057 sites and falling | `docs/PORT-PLAN.md` |
+| **More than half the game's code compiling for Linux** | ✅ 54 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
+| **The rest compiling** | ❌ Not yet — pointer-width work, 385 sites left in 12 files | `docs/PORT-PLAN.md` |
 
 **Full current status, rewritten whole each round so it cannot contain a stale claim
 above a fresh one: [`progress.md`](progress.md).**
@@ -187,15 +190,15 @@ The decompiled source is **not in this repository.** It is a separate, public,
 GPL-licensed matching decompilation; this repo ships only the tools used to measure it,
 the fixes that came out of it, and the numbers.
 
-**What compiles today:** **37 of 66** translation units on `x86_64-linux-gnu`; 66 of 66 on
+**What compiles today:** **54 of 66** translation units on `x86_64-linux-gnu`; 66 of 66 on
 `i386-linux-gnu` — the second only with `-Wno-c++11-narrowing`, the flag that build
 actually uses. The i386 build is kept deliberately as a **diagnostic oracle**: a file that
 fails on x86_64 but passes on i386 is blocked by pointer width and nothing else, which is
-all 29 of them. Every remaining error is one class — a pointer cast into a smaller integer
-type — at **1,057 sites**, down from 1,377 on the morning of 12 October. Both counts
+all 12 of them. Every remaining error is one class — a pointer cast into a smaller integer
+type — at **385 sites**, down from 1,377 on the morning of 12 October. Both counts
 reproduce with `tools/sweep-compile.sh`.
 
-**How the last four came in (12 October).** The 33 failures were not evenly priced. Three
+**How the first four came in (12 October, tier 1).** The 33 failures were not evenly priced. Three
 were a single line each; one was a program that truncated a pointer and then wrote silently
 through the truncated value. And 308 of the 1,377 sites — 22% of the entire remaining work
 — were the *same call*: `Sprite_FillRect((int)g_pGraphics + 0x150, …)`, across 14 files,
@@ -207,6 +210,32 @@ the sweep passes `-w`, so any of these sites can be made to compile by casting t
 `intptr_t` and letting the value silently narrow into the `int` it is passed to. That
 raises this number without making a single pointer whole. Every edit above widened a
 type.**
+
+**How the next seventeen came in (12 October, tier 2 — 37 → 54).** Held to the same rule:
+1,178 sites became 385, and not one edit is a cast papering over a narrowing. Most of the work
+was not casts at all but **wrong types in the decomp**, which is why the sites fell faster
+than the file count: `CFrontend::GetArchivePrimaryIDEntry` was declared `void *` while
+returning an `int` field of `g_unk0x00516b40.ids[]` — one return type corrected 23 sites in
+9 files; `MenuItem::param` and the five `Menu_AddItemType*` parameters hold a function
+pointer (the code calls it as one) — 313 sites; `g_menuNextAction` holds a `Menu *` — 99
+sites; a dozen small interfaces (`Font_Unused`, `Collision_SeparateCarBoxes`,
+`CGraphics::ApplyTextureStageChange`, `Sound_NoOpMusicCallback`, the ACM callbacks'
+`dwInstance`, …) each take a pointer through an `int` parameter.
+
+Because the temptation is now bigger, so is the check:
+[`tools/ptrwidth-audit.sh`](tools/ptrwidth-audit.sh) recompiles every translation unit with
+**no `-w`** and `-Wshorten-64-to-32`, naming with a file and a line every place a 64-bit
+value lands in a 32-bit container; every rewritten cast had to pass it, and every line it
+complained about was reverted whole. Truncation warnings on the tree went **36 → 25** — down,
+because widening removed real ones, and none of the 25 is on a line tier 2 touched.
+
+**And the play build was checked, not assumed.** `work/PLAY/out-plain/cmr2` — the 32-bit
+binary the desktop icon launches — was rebuilt and passes its own drive gate, and then the
+two links were compared function by function with addresses normalised: **3,635 functions,
+3,633 identical instruction for instruction**, the two exceptions being the ID-entry
+accessors, which differ only in which register holds the GOT base. Every affected file
+recompiled for i386 from the untouched tree has a **byte-identical `.text`**. `intptr_t` is
+`int` on i386; that is measured here, not assumed.
 
 **These are compile-level numbers.** ASAN does not build on this toolchain, so there is no
 runtime evidence about the port's correctness, and this repository will not imply there

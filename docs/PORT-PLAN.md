@@ -136,6 +136,55 @@ the i386 build actually uses.** Without that flag the same sweep reports 64/66:
 `Game.cpp` and `GameInfo.cpp` put values above `INT_MAX` in 32-bit `case` labels.
 `tools/sweep-compile.sh` now passes it and reproduces both counts.)*
 
+**UPDATE 2026-10-12, LATER (the tier-2 pointer pass, `tools/fixes/patch_ptrwidth_tier2.py`).**
+Same harness, same tree, same night: **54 / 66 on x86_64** (12 fail), **66 / 66 on i386** —
+the raw sweep prints `PASS 55 FAIL 12 TOTAL 67` because the 67th unit is our own
+`Lenatrace.cpp`. Remaining sites: **385**, down from 1,178 at the start of the pass and
+1,377 in the morning. Seventeen files came in: `Collision2D`, `Frontend`, `FrontendDraw`,
+`FrontendMenus`, `GameMenus`, `Graphics`, `HudDash`, `Input`, `Menu`, `NetPlayers`,
+`OptionMenuRows`, `RallyTiming`, `Sound`, `Sprite`, `StageUI`, `SurfaceTypes`,
+`VehiclePhysics`. **Zero regressions** — no file that passed before fails now. Logs:
+`work/RTN-20261012/sweep-before.log` (37) and `sweep-final.log` (54), round report
+`work/RTN-20261012/REPORT.md`.
+
+Most of the sites did not fall to casts. They fell to **types that were wrong in the
+decompilation**: `CFrontend::GetArchivePrimaryIDEntry` and `…SecondaryIDEntry` were declared
+`void *` and returned `g_unk0x00516b40.ids[index]`, an `int` field, while every one of their
+callers cast the result back to `int` — one return type, 23 sites, 9 files. `MenuItem::param`
+and the five `Menu_AddItemType*` `param` parameters hold a **function pointer** (Menu.cpp:476
+calls that slot as one); `g_menuNextAction` and `Menu_SetNextAction` carry a `Menu *`. 313 +
+99 sites, and the honest fix is `intptr_t`, not a wider cast on the caller.
+
+**The check that keeps this honest, stated because the next pass will need it more than this
+one did.** The sweep passes `-w`, so any of these sites can be made to compile by writing
+`(intptr_t)` and letting the value silently narrow back into the `int` it is stored in. That
+raises the published count and makes no pointer whole. `tools/ptrwidth-audit.sh` compiles
+every unit with no `-w` and `-Wshorten-64-to-32 -ferror-limit=0`, so every 64-bit value that
+lands in a 32-bit container is named with a file and a line; every rewritten cast in this
+pass had to survive it, and lines it flagged were reverted whole (346 of 529 in the first
+pass, 331 of 347 in the second). Truncation warnings went **36 → 25**. The number went up
+because code changed, not because the compiler was told to be quiet.
+
+**The play build.** The 32-bit `work/PLAY/out-plain/cmr2` was rebuilt with its own gate
+(`build-play-lre.sh`, which refuses to install a link that cannot drive) and then the two
+links were compared function by function with addresses normalised: **3,635 functions,
+3,633 byte-identical in instruction stream**, the two exceptions being the ID-entry
+accessors, which differ only in which register holds the GOT base and return the same value.
+All 18 affected units recompiled for i386 from the untouched tree have a byte-identical
+`.text` — `intptr_t` *is* `int` there, which the DWARF in those objects states literally as
+`'intptr_t' (aka 'int')`.
+
+**Still open, priced.** 12 files. `StageObjects.cpp` 78 and `GameInfo.cpp` 65 are `int`
+slots *inside records the game itself reads*; `StageTiming.cpp` 74 is the particle
+texture-handle chain (`LOAD_EFFECT_TEXTURE()` → 16 `int` globals → `ParticleType` fields);
+`Car.cpp` 36 and `RallyData.cpp` 32 are car-record handles; the rest are a dozen small call
+interfaces. And `SceneNode.cpp`'s last 4 are the one place this pass stopped on purpose:
+`pHeader[2] = (int)p` stores a pointer into an array whose other elements are read as 32-bit
+counts, so widening the array changes what the surrounding ints mean. That is a
+data-layout decision, not a cast fix.
+
+---
+
 **UPDATE 2026-10-12 (the tier-1 pointer pass, `tools/fixes/patch_ptrwidth_tier1.py`).**
 Re-measured tonight with the same harness: **37 / 66 on x86_64** (29 fail), **66 / 66 on
 i386** — the 67th translation unit in the tree is our own `Lenatrace.cpp`, and it passes, so
@@ -299,7 +348,8 @@ these was reported before it had been run.
 | 463 stubs | 16 placeholders | classifier called accessors stubs |
 | 19/66 compiles | 26/66 x86_64, 53/66 i386 | it had never been run |
 | 26/66 x86_64, 53/66 i386 | **33/66 x86_64, 66/66 i386** after P3+P1 — i386 only with `-Wno-c++11-narrowing` (64/66 without; see §3) | re-measured 2026-10-10 18:20, `docs/P3-P1-REPORT.md`, re-run 18:5x |
-| 33/66 x86_64 (2026-10-10 → 2026-10-12) | **37/66 x86_64** after the tier-1 pointer pass; 1,377 → 1,057 sites (2026-10-12) | it was not wrong, it was *stale-standing*: nothing between the two dates was pointer work. Both sweeps named in §3 |
+| 33/66 x86_64 (2026-10-10 → 2026-10-12) | **37/66 x86_64** after the tier-1 pointer pass; 1,377 → 1,057 sites (2026-10-12 morning) | it was not wrong, it was *stale-standing*: nothing between the two dates was pointer work. Both sweeps named in §3 |
+| 37/66 x86_64 (2026-10-12 17:39) | **54/66 x86_64** after the tier-2 pointer pass; 1,178 → 385 sites; 17 files, zero regressions; the 32-bit play build rebuilt, drive-gated, and function-compared 3,633/3,635 identical | measured 2026-10-12 17:5x, `work/RTN-20261012/sweep-before.log` vs `sweep-final.log`, report in `work/RTN-20261012/REPORT.md` |
 | 149 D3D7 calls | 278 call sites / 20 methods | wrong regex, stated anyway |
 | 14 Win32 calls | 45 files include `windows.h` | regex ran without `re.M` |
 | 5 files with `__asm` | 6 files, 35 blocks | per-file count, missed a header |

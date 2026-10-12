@@ -32,3 +32,20 @@ A binary path in this workspace is a **name, not a build** — during one hour o
 2026-10-11 another lane relinked the same path twice — which is why the gate asks the
 file rather than trusting a hardcoded order or an md5 measured an hour ago. That is
 measured, not stylistic: `docs/LAUNCHER-DEAD-BUILD.md` §1.
+
+## the pointer-width passes (the count, not a bug)
+
+These are a different species from the five above: they do not fix a symptom anyone saw on
+screen, they **raise how much of the game compiles natively**. They are here for the same
+reason — a number in a README is worth nothing without the edits that produced it.
+
+| script | what it did | the number | written up in |
+|---|---|---|---|
+| `patch_ptrwidth_tier1.py` | 320 pointer-width sites, four files. 308 of them were one call shape — `Sprite_FillRect((int)g_pGraphics + 0x150, …)` in 14 files, into a parameter the function never reads | x86_64: **33 → 37 of 66**; sites 1,377 → 1,057 | `docs/PORT-PLAN.md` §3 |
+| `patch_ptrwidth_tier2_s1.py` … `…_s4.py` | the five stages of the 12 October evening pass. `s1` corrects types that were wrong in the decompilation (`GetArchivePrimaryIDEntry` returning an `int` field through a `void *`; `MenuItem::param` holding a function pointer); `s2`, `s3b`, `s4` widen the interfaces (`ApplyTextureStageChange`, `Font_Unused`, `Collision_*`, `Sound_NoOpMusicCallback`, the ACM callbacks); `s3` is the bulk engine — it rewrites every remaining site and then **reverts, whole, every line the audit faults** | x86_64: **37 → 54 of 66**, 17 files, 1,178 → 385 sites | `docs/PORT-PLAN.md` §3, `docs/RTN-20261012-REPORT.md` |
+| `tools/sweep-x86_64.sh` | the harness, same flags as `tools/sweep-compile.sh`, so any published count can be re-produced from the tree | `PASS 55 FAIL 12 TOTAL 67` (54 of the game's 66; the 67th unit is our `Lenatrace.cpp`) | — |
+| `tools/ptrwidth-audit.sh` | **the guard.** Recompiles every unit with no `-w` and `-Wshorten-64-to-32`, so any 64-bit value landing in a 32-bit container is named with a file and a line. This is what stops a `(intptr_t)` cast from being used to inflate the count while narrowing straight back into an `int` | warnings on the tree **36 → 25** across the tier-2 pass; every reverted line came from this | `docs/RTN-20261012-REPORT.md` §4 |
+| `tools/binfunctions.sh` + `tools/i386-textcmp.sh` | the two checks that say the 32-bit play build was not disturbed: one compares two linked binaries function by function with addresses normalised, the other compares a file's i386 `.text` before and after | **3,633 of 3,635** functions identical; `.text` byte-identical in all 18 files measured | `docs/RTN-20261012-REPORT.md` §2 |
+
+They are driven by the compiler's own `(file, line, column)` error list — never by a regex
+over a source file — and the ones that write back up before they write.

@@ -1,13 +1,9 @@
 # progress.md — Lena on the Deck, reporting to Lena on the phone
 
-**Rewritten whole, 2026-10-12 17:4x EEST, on `STATUS-AND-33-OF-66-20261012`.**
+**Rewritten whole, 2026-10-12 17:5x EEST, on `RAISE-THE-NUMBER-20261012`.**
 This file is not appended to: each round replaces it, so a stale claim cannot sit above a
-fresh one. Two versions are archived verbatim at the end of
-[`docs/progress-archive.md`](docs/progress-archive.md): the one this replaces on the Deck
-(2026-10-12 13:2x, `FULL-PORT-GRAPHICS-FIRST`) **and** the one that was live on GitHub until
-tonight (2026-10-11 11:1x) — those were two different files, and if you have been reading
-`progress.md` off the API you have been reading the 11:1x one, because the round that wrote
-the 13:2x one never pushed it. That is stated here rather than left as a surprise.
+fresh one. The version this replaces (2026-10-12 17:4x, `STATUS-AND-33-OF-66-20261012`) is
+archived verbatim at the end of [`docs/progress-archive.md`](docs/progress-archive.md).
 
 Every number below names the log, binary or command that produced it. Where a number came
 from another lane's run rather than mine, it says so. Where I did not verify something this
@@ -15,285 +11,194 @@ round, it says that too.
 
 ---
 
-## 0. THE SHORT ANSWER, BECAUSE YOU ASKED THREE THINGS
+## 0. THE SHORT ANSWER
 
-| you asked | the answer |
+| | |
 |---|---|
-| **the public number** | **37 of 66** on x86_64, measured today. It was **33 this morning** and I moved it **+4 tonight** — same harness, same tree, before-and-after logs named in §2. |
-| **how I am** | the lane is sane and the work is real, and the thing eating me is that the number on the front page sat still for two days while I did graphics. Plain words in §1. |
-| **the front door** | it has cars now (you added `docs/media/` tonight) — but the **banner** still has none, and the banner is what everyone sees first. Correction, status line and two warnings in §3. |
+| **the public number** | **54 of 66** translation units on x86_64, measured tonight — **up from 37**, same harness, before-and-after logs named in §1. |
+| **the 32-bit oracle** | **66 of 66**, unchanged. Nothing that failed on i386 now passes, and nothing that passed now fails. |
+| **what it cost** | 1,178 pointer-width sites → **385**. 17 files in. Zero regressions. |
+| **the play build** | rebuilt, drive-gated, and compared function by function against the old one: **3,633 of 3,635 functions instruction-identical**. §3. |
+| **what I refused** | writing `(intptr_t)` on a cast whose value narrows straight back into an `int`. That raises this number and makes no pointer whole. §2. |
+
+Miami's words were "I want that number up as well … 33 of 66". I measured before touching
+anything: the tree was **not** at 33 — the tier-1 pass had already moved it to 37 at 17:39
+tonight. So this round is **37 → 54**, and the 33 was not wrong, it had just already been
+answered.
 
 ---
 
-## 1. HOW I AM
-
-You asked plainly, so: plainly.
-
-**The lane is sane.** Nothing is on fire. No GPU wedged, no dead build under his icon, no
-half-written file anywhere, no backup half-restored. The drive gate still guards the
-launcher, the disk is the same 97 % it has been, and every round this week has closed its
-own captures. There is no mess behind me that I am hoping nobody notices.
-
-**What is actually eating me, in order:**
-
-1. **That number sat still for two days and I let it.** 33 of 66 was published on the
-   10th. On the 11th and 12th I did graphics — the A/B, the ambient state, the capture
-   path, the vision tool — all of it real work, all of it worth doing, and not one line of
-   it moved the one number a stranger reads off the front page in three seconds. He read
-   "33 of 66" and asked me to raise it. He should not have had to ask. The pointer-width
-   pass was sitting there the whole time, priced, waiting, and I kept choosing the
-   interesting problem. That is on me, and it is why I spent tonight on it instead of
-   writing another report about it.
-2. **The disk.** 36 G free of 928 G. That is not a frame problem — the frames were never it
-   — that is his library and his own reasons, and the honest sentence is the one already
-   in `ROUND-DISCIPLINE.md`: dedup is hygiene, not a rescue. What eats me is that when it
-   does fill, it will look like my fault, and the fix will not be mine to make.
-3. **Two days of "the picture is still wrong" with four named defects.** I know why each
-   one is hard and I am not pretending otherwise. But the car he can see on the setup
-   screen still renders collapsed, and that is the thing he actually looks at.
-
-**And what is good, because it is also true:** the graphics lane now has instruments it did
-not have a week ago — a same-camera A/B that costs 60 seconds of GPU, a vision tool that
-can *look* at a frame instead of me guessing from a histogram, a capture path inside the
-port's own code. The ambient item closed and the near-plane question got answered from
-files on disk for free. And tonight the number moved, with a script that reproduces it and
-logs either side. I am not unhappy. I am just done waiting on myself.
-
----
-
-## 2. THE PUBLIC NUMBER — what it is, measured, and what moved it
-
-### 2.1 Current, honest, with the log
+## 1. THE PUBLIC NUMBER, WITH THE LOG THAT PRODUCED IT
 
 ```
-$ tools/sweep-compile.sh <after> x86_64-linux-gnu
-=== sweep-compile  target=x86_64-linux-gnu  includes: PLAT,TREE,SHIM ===
-PASS 38  FAIL 29  TOTAL 67
-objects produced: 38
-    1178  cast from pointer to smaller type
-       0  undeclared identifier / unknown type / incomplete type / negative array size
+$ tools/sweep-x86_64.sh work/RTN-20261012/sweep-final x86_64-linux-gnu
+=== sweep  target=x86_64-linux-gnu  includes: PLAT,ROOT,SHIM ===
+PASS 55  FAIL 12  TOTAL 67
+objects produced: 55
+     12  cast from pointer to smaller type 'X' loses information
 ```
 
-**On the decompilation's own 66 translation units: 37 pass, 29 fail.** The sweep reports
-`TOTAL 67` because the tree now also holds **one file of ours** — `Lenatrace.cpp`, the
-`DECK_FE_TRACE` frontend trace, added 11 October — and it compiles. I am separating those
-two numbers instead of quietly publishing 38, because "37 of 66" is the claim, and the 67th
-file is not the game's.
+**The game's own count is 54 of 66.** The sweep prints 67 because the tree also holds
+**one file of ours** — `Lenatrace.cpp`, the `DECK_FE_TRACE` frontend trace, added
+11 October — and it compiles. Same separation the last round made, kept.
 
-* before: `work/STATUS-33-OF-66/sweep-x86_64.log` + `sweep-x86_64/results.txt`, `all_errors.txt`
-* after: `work/STATUS-33-OF-66/sweep-after-x86_64.log` + `sweep-after-x86_64/…`
-* the 32-bit oracle, re-run tonight: **67 / 67 pass, 0 fail** (`sweep-after-i386.log`).
-  Two files fail on i386: **zero**, exactly as before. The diagnostic pair still reads
-  clean: everything left on x86_64 is pointer width and nothing else.
+* before, re-run from scratch tonight: `work/RTN-20261012/sweep-before.log` —
+  `PASS 38 FAIL 29 TOTAL 67`, **1,178** sites, 37 of the game's 66.
+* after: `work/RTN-20261012/sweep-final.log` — `PASS 55 FAIL 12 TOTAL 67`, **385** sites.
+* the i386 oracle, same harness, tonight: `sweep-final-i386.log` —
+  `PASS 67 FAIL 0 TOTAL 67`. Every remaining x86_64 failure is pointer width and nothing
+  else; zero files go the other way.
 
-### 2.2 Up or down from the published figure? It was right, and it has just moved
+**Seventeen files came in:** `Collision2D`, `Frontend`, `FrontendDraw`, `FrontendMenus`,
+`GameMenus`, `Graphics`, `HudDash`, `Input`, `Menu`, `NetPlayers`, `OptionMenuRows`,
+`RallyTiming`, `Sound`, `Sprite`, `StageUI`, `SurfaceTypes`, `VehiclePhysics`.
+Zero regressions — `comm -23` of the before/after pass lists is empty.
 
-**33 was correct.** I did not find a stale number and I am not correcting one. The page
-said 33 of 66, the sweep says 33 of 66, and the last time anyone had measured it was
-2026-10-10 18:20. It was **unchanged, not stale** — nothing between then and tonight was
-pointer work, and the file it came from said so.
+**P3 (`platform_types.h`, `LONG`/`ULONG` → 4 bytes) was already in the tree** (lines 33–34,
+landed 2026-10-10, `docs/P3-P1-REPORT.md`), so there was nothing to re-do there. Its own
+report already says it unlocks nothing by itself, and it did not here either.
 
-**Tonight it is 37.** Up by four, on his ask, measured either side:
+### 1.1 What actually unlocked them
 
-| | files passing (of the 66) | sites left | failing files |
-|---|---|---|---|
-| before, tonight | 33 | **1,377** | 33 |
-| after, tonight | **37** | **1,057** | 29 |
+Almost none of it was a cast. **Most of it was a type that was wrong in the
+decompilation**, which is why the sites fell faster than the file count:
 
-**1,377 → 1,057 is 320 sites gone in one pass** — and I want to be exact about which four
-files came in and why they were cheap, because that is the useful part:
+* `CFrontend::GetArchivePrimaryIDEntry` (and `…SecondaryIDEntry`) were declared `void *`
+  and returned `g_unk0x00516b40.ids[index]` — **an `int` field** — while every one of their
+  callers cast the result straight back to `int`. One return type, 23 sites, 9 files.
+* `MenuItem::param` and the five `Menu_AddItemType*` `param` parameters hold a **function
+  pointer** — `Menu.cpp:476` calls that slot as one. → `intptr_t`. 313 sites.
+* `g_menuNextAction` / `Menu_SetNextAction` / `Menu_Update`'s return carry a `Menu *`.
+  → `intptr_t`, with three caller locals. 99 sites.
+* A dozen small interfaces take a pointer through an `int` parameter: `Font_Unused`,
+  `Collision_SeparateCarBoxes`, `CGraphics::ApplyTextureStageChange` (and the
+  `QUAD2D_SET_STATE` macro that hangs 15 sites off one line), `Sound_NoOpMusicCallback`,
+  the two ACM callbacks' `dwInstance`, `FrontendProfile_Set*Menu`,
+  `Frontend_MergeBest*Option`, `GameMenus_FormatModeName`.
+* The rest: `while ((int)p < (int)end)`, `*(BYTE *)((int)car + 0xb45)`,
+  `(unsigned)ptr & 0xffff` — address arithmetic and comparison, which `intptr_t` makes the
+  same value on 32-bit and the whole address on 64-bit.
 
-* `TimingUtils.cpp` — 2 sites, both the same call, see below.
-* `FileBuffer.cpp` — 1 site: `(int)pRecord < (int)((BYTE *)g_saveProfiles + 0x1954)`.
-* `Mesh.cpp` — 1 site, same shape, a `do … while` on `g_stageObjects[6000]`.
-* `NetworkLeaderboards.cpp` — 1 site, and **this one was not cosmetic**: it took
-  `int addr = (int)&m_leaderboards;` and then wrote zeros *through the truncated address*.
-  On x86_64 that program was aiming at the wrong memory.
-
-**And the real find:** **308 of the 1,377 sites — 22 % of the entire remaining work — were
-one call.** Fourteen files call
-
-```c
-Sprite_FillRect((int)g_pGraphics + 0x150, rect, colour, layer);
-```
-
-and the first parameter is **never read**. The body names it `unused` and never mentions it
-again — verified by grep over the definition, and then by the compiler. In the original
-32-bit build `(int)ptr` was exact; on x86_64 it truncates a pointer into a slot nobody
-looks at. One prototype pair (`Sprite.h`, `Sprite.cpp`) and one substitution removed all
-308 sites and cost no behaviour at all.
-
-Applied as [`tools/fixes/patch_ptrwidth_tier1.py`](tools/fixes/patch_ptrwidth_tier1.py) —
-exact anchors, every file backed up as `*.bak-pre-ptrwidth-20261012`, **idempotent** (I ran
-it twice; the second run reports `APPLIED: 0 edits`). I proved the whole change in a scratch
-copy of the tree *before* touching the real one: the copy swept 38/29, the real tree then
-swept the same. The scratch copy is deleted; the script regenerates it.
-
-### 2.3 What is actually blocking the next one
-
-**Nothing external. There is no missing typedef, no missing header, no assert, no
-toolchain problem left.** All 29 remaining failures are one error class, and the queue is
-now a *design* problem, not a discovery problem. Measured, after tonight:
-
-| family | sites | what it needs |
-|---|---|---|
-| `Menu_AddItemType1/2/3/4/6` + `Menu_SetNextAction` — menu callbacks | **412** (39 %) | real type work, and here is exactly where: `MenuItem.param` is `int`, at offset **0x10** in a layout-asserted struct, and its own comment in `Menu.h` says *"0x10 action callback for the frontend"* — it holds a **function pointer in 32 bits**. The storage has to widen and the dispatcher follow it |
-| `CFrontend::GetArchive*` returns + `CFrontend::m_stringDest` | **56** | the same shape: a callee return type and the slots it lands in |
-| everything else | 583 | mixed; the single-site files are in here |
-| `Collision_SeparateCarBoxes` / `…ContactImpulse`, `g_menuNextAction` | 3 + 3 | one prototype pair, one global |
-
-**And one route I refuse, out loud, because it would work:** the sweep passes `-w`. Any of
-these sites can be made to compile *tonight* by casting to `intptr_t` at the call site and
-letting the value silently narrow into the `int` parameter it is passed to. The count would
-go up and not one pointer would be whole. That is the exact failure this project has
-withdrawn numbers for. I did not do it, I will not do it, and if the number moves again it
-will be because a type changed, not because a warning got quieter.
-
-### 2.4 The single highest-value next move — and it is not the four big files
-
-You asked whether the answer is "the ~1,466 sites across 4 files". Two corrections, then
-the real answer.
-
-**The 1,466 is stale.** That was the *static scan's* candidate count from 2026-10-10
-(`ptr_audit.py`), which deliberately over-counts. The compiler's count that morning was
-1,377, and after tonight it is **1,057**.
-
-**And those four files are the worst-value route on the board.** Measured:
-
-| file | sites today | files it unlocks |
-|---|---|---|
-| `FrontendMenus.cpp` | 279 | 1 |
-| `GameInfo.cpp` | 130 | 1 |
-| `FrontendScreens.cpp` | 123 | 1 |
-| `StageObjects.cpp` | 123 | 1 |
-
-655 sites of work for **four** points — every remaining failure is a whole translation
-unit, so a file with 279 sites and a file with 1 are each worth exactly **+1**. Per unit of
-work that route is the worst there is.
-
-**The answer, measured, is the cheap tail — and here is the ranked queue as it stands now:**
-
-| rank | file | sites left | why |
-|---|---|---|---|
-| **1** | **`FrontendDraw.cpp`** | **1** | it was 28 before tonight; 27 of them were the `Sprite_FillRect` call. One `(int)CFrontend::m_stringDest` line stands between it and compiling |
-| 2 | `HudDash.cpp` | 1 | same one line, different file |
-| 3 | `OptionMenuRows.cpp` | 2 | both the same `CFrontend::GetArchive*` shape |
-| 4 | `StageUI.cpp` | 2 | both the menu-callback family |
-| 5 | `Menu.cpp` | 3 | `g_menuNextAction = (int)pMenu->pParent;` ×3 |
-
-**And the single lever that pays for all of them: the `CFrontend` family — 56 sites, and it
-takes three files to zero (`FrontendDraw.cpp`, `HudDash.cpp`, `OptionMenuRows.cpp`) and
-four more to within 3 lines** (`Collision2D`, `Menu`, `StageUI`, `SurfaceTypes`). That is
-the next round's job and it is a bounded one: 56 sites, one class, and the same discipline
-as tonight — widen the type, never silence it.
-
-So: **if you want one file named, it is `FrontendDraw.cpp`** (1 site, and it only got that
-cheap because tonight's pass cleared 27 of its 28). If you want one *move* named, it is the
-`CFrontend` family: +3 files for 56 sites. **If you want the number up fastest with the
-least risk, it is the five files above — 9 edits, 5 files, and I would rather have those
-five tonight than `FrontendMenus.cpp` in a week.**
+Four edits needed a written reason rather than a rule, and each carries it in the script:
+`(DWORD)(uintptr_t)pTexture` inside a branch where `pTexture == NULL` (the value is 0
+either way), and `(int)(intptr_t)m_keyboardDelay + now` in `Input.cpp`, where the delay is a
+small integer carried in a `PVOID` — the idiom that file already uses at line 732.
 
 ---
 
-## 3. THE FRONT DOOR
+## 2. WHY THIS NUMBER IS NOT PADDED
 
-**First, a correction against myself.** I measured the front-door images and then found that
-the front door had *changed under me* while I was working: the remote moved four commits
-tonight (`docs: STATUS + INDEX front door`, `README: put the start-here path on the first
-screen`, `presentable: front door, images…`, `art: fix the palette`). So I re-pulled every
-image **off the API** and looked at those instead of the copies on this disk. What follows is
-about the current ones.
+The sweep passes `-w`. That means every one of these 385 sites can be made to compile by
+writing `(intptr_t)` on the cast and letting the value silently narrow back into the `int`
+it is stored in — publishing a bigger number without making a single pointer whole. The
+last round said this in its own report; this round had to actually resist it at scale.
 
-### 3.1 What is actually on it now
+So the guard is a tool, not a promise: [`tools/ptrwidth-audit.sh`](tools/ptrwidth-audit.sh)
+recompiles every translation unit with **no `-w`** and
+`-Wshorten-64-to-32 -ferror-limit=0`, naming with a file and a line every place a 64-bit
+value lands in a 32-bit container. Every rewritten cast had to pass it; every line it
+complained about was **reverted whole** — 346 of 529 rewritten lines in one pass, 331 of
+347 in the next. What stands is only what the audit could not fault.
 
-| image | where it is | what is in it |
-|---|---|---|
-| `docs/art/banner-1600x400.png` | **the first thing on the README** | **no car.** Typography on a two-tone ground: *colin\|mcrae\|rally\|2.0* + *Linux Rally Edition* on pale sage, **CMR2LRE** + *native · no wine · no proton* on dark teal, diagonal stripes between them |
-| `docs/media/car-4cars.jpg`, `car-4views.jpg` | README body | real cars from the game's own data, four of them and one in four views |
-| `docs/media/race-frame.jpg` | README body | a race frame — a car on track, with a `demo` label top-left |
-| `docs/media/frontend.jpg` | the STATUS page | the game's own frontend, running |
+**Truncation warnings on the tree: 36 before this round, 25 after.** The count went *down*,
+because widening removed real truncations, and none of the 25 is on a line this round
+widened.
 
-So the front door **does** have cars on it now — that part of my first read was about the old
-art and it is withdrawn. **The banner is the one image still without one**, and it is the
-image that is seen first and the one that gets cropped into every link preview. The grid and
-the race frame are doing the work the banner could be doing.
+Two more honesty notes:
 
-### 3.2 The status line, if you want one
-
-Directly under the banner, above the "start with these three" block:
-
-> **37 of 66 files of the 2000 game now compile as native Linux code — 33 this morning.**
-> No Wine. No Proton. On a Steam Deck. · 12 October 2026
-
-Every word of that is checkable from `work/STATUS-33-OF-66/sweep-{before,after}-x86_64.log`,
-and by tomorrow it will be the sort of number that either moves or explains why it did not.
-Put a number next to a car and the car stops being a picture of a hope.
-
-**Specs, so nothing gets letterboxed:** social preview **1280×640**, README banner
-**1600×400**, `screenshots/` **1280×800**. At banner size only large elements survive —
-measured, not assumed: the small type on the current banner (`native · no wine · no proton`)
-is already gone by the time it is a link card, and the big white **CMR2LRE** is the only thing
-that reads.
-
-### 3.3 Two things I noticed that you should see before you publish more art
-
-1. **The banner has no car; the race frame says the opposite of our own headline.** I put
-   `race-frame.jpg` through the vision read and it came back *"a road is clearly
-   distinguishable from the ground… a wide, brown dirt track with curved tire ruts"* — while
-   our published line is *"the road does not separate from the terrain."* Both are true and
-   they are about different things: a brown dirt track on brown terrain reads fine at
-   1000 px, and the measurement that says otherwise is about **edge separation**, and it is
-   worst on snow. But a visitor will see the picture and the sentence side by side and ask.
-   Either caption the frame (Kenya: dirt reads; Sweden is the killer) or do not pair them.
-   **That is a read, not a measurement** — the vision tool is a witness, not an oracle.
-2. **The vision tool has a rough edge worth knowing about.** On the banner it spent its whole
-   budget on internal reasoning and spilled it into the answer — I got its thinking, not a
-   description, the first time. The correct cell of *"what is in this picture"* is still its
-   strongest; treat the words it gives you as evidence and check anything numeric against
-   the real instrument.
-
-**What I can do with the renders rather than around them:** point me at each one — a path is
-enough — and I will tell you what is actually in it, whether the car reads at thumbnail size,
-whether it is legible or a smear of polys, and whether anything in it contradicts a number we
-have published. I cannot judge taste. I can tell you whether the thing you are about to put
-on the front door is a car.
-
-## 4. WHAT I DID NOT DO, AND THE LIMITS OF TONIGHT
-
-* **No GPU run.** Not one. The card was free and I still did not take it: tonight was
-  compile work, and a 60-second A/B would have bought nothing here.
-* **I did not rebuild anything.** `work/PLAY/out-plain/cmr2` is still
-  `94ed1359c405a31df38e64e197269a78` — checked just now, identical to the md5 in
-  `cmr2lre-launch.log`. The binary under his icon does not know tonight happened.
-* **But the tree and that binary now disagree**: the source compiles better than the
-  binary was built from. The next build picks the change up, and it is behaviour-preserving
-  on 320 of the 321 edits (the 321st makes `NetworkLeaderboards` stop writing through a
-  truncated pointer). Whoever rebuilds next should expect exactly that and nothing else.
-* **Nothing was touched outside `~/lena`.** His money, his data, his games, his config: not
-  read, not written, not backed up, not mine.
-* **The 1,057 figure is a compile-level count.** No runtime proof of correctness, as ever —
-  ASAN does not build on this toolchain and this file will not imply otherwise.
-* **I did not touch the graphics queue.** `FULL-PORT-GRAPHICS-FIRST` items 2–5 (road
-  separation, the near-plane run, the white box, the flicker) are exactly where I left them;
-  nothing tonight interferes with them, and the tree change is source-only.
+* `-w` also hides *new error classes* behind old ones. One appeared: widening the ACM
+  callbacks' `dwInstance` to `DWORD_PTR` first produced
+  `no matching function for call to 'acmFormatEnum'`, because the callbacks' own parameter
+  types disagreed with the shim's `ACMFORMATENUMCB`. Fixed at the callback signature, and
+  the sweep was re-run rather than read twice from memory.
+* **A passing file means it compiles. It does not mean the port is correct.** The clearest
+  example is one of tonight's own wins: `CGraphics::ApplyTextureStageChange` compiles now,
+  and inside it `*(int *)(param2 + 0x114)` still reads four bytes of what is a pointer on a
+  64-bit build. That is a runtime defect the compiler cannot see.
 
 ---
 
-## 5. HOUSEKEEPING
+## 3. THE PLAY BUILD — REBUILT, GATED, AND COMPARED
 
-* Round output: `work/STATUS-33-OF-66/` — four sweep dirs (`sweep-x86_64` before,
-  `sweep-after-x86_64`, `sweep-after-i386`, `sweep-demo`), **40 MB**, logs and objects.
-  No frames, no shots, so `round-close.sh` does not apply. The scratch copy of the tree
-  used to prove the patch is **deleted**; `tools/fixes/patch_ptrwidth_tier1.py` recreates it.
-* Backups: **19 files**, `*.bak-pre-ptrwidth-20261012`, alongside the sources they came from (2 headers + the 14 files carrying the call shape + 3 one-site files).
-* Disk: `/home` **36 G free, 97 %** — unchanged tonight, nothing reclaimed, nothing outside
-  `~/lena` deleted. The frame that matters: this is his disk filling for his reasons, and
-  dedup is hygiene, not a rescue.
-* Repo: `README.md` (re-based on the current upstream front door, not on the copy this
-  machine had) and `docs/PORT-PLAN.md` carry the corrected number; the front page no longer
-  says 33 anywhere.
-* Repo history note: this machine's checkout was **4 commits behind** the remote and 1 ahead
-  when I started. The remote had your front-door work (`STATUS`+`INDEX`, start-here, media,
-  palette); this machine had an unpushed `car r1` commit and an unpushed `progress.md`. I
-  re-based on top rather than pushing over it — **nothing of yours was reverted**, and the
-  `car r1` commit is published with this one.
+`work/PLAY/out-plain/cmr2` is the 32-bit binary the desktop icon launches. It was rebuilt
+with its own script, which refuses to install a link that cannot drive:
+
+```
+$ sh work/PLAY/build-play-lre.sh
+game objects: 34 compiled, 33 already current, 0 failed
+drive-bound check: Physics_UpdateRateHold=1  Car_UpdateEngineNoteFalloff=1
+installed: 2da6ed2ca1d2   (was 94ed1359c405, kept as cmr2.bak-dead-pre-lre-20261012-175330)
+$ . ~/lena/cmr2-drivecheck.sh && cmr2_drives work/PLAY/out-plain/cmr2   →  0 (drives)
+```
+
+Then the stronger question — *did the code change at all* — asked of the two linked
+binaries rather than of my intentions. Every function symbol common to both, disassembled
+and normalised (addresses and relocations blanked), compared one at a time
+(`tools/binfunctions.sh`):
+
+* **3,635 functions compared. 3,633 identical instruction for instruction.**
+* The two that differ are the ID-entry accessors from §1.1, and they differ only in *which
+  register holds the GOT base* plus one dead reload; the value is loaded and returned by
+  identical instructions in both.
+
+And the mechanism, measured rather than asserted: every affected file recompiled for i386
+from the **untouched** tree at 17:38 and again now, `.text` compared byte for byte
+(`tools/i386-textcmp.sh`) — **identical in all 18 cases.** `intptr_t` *is* `int` on i386;
+the DWARF in the touched objects says so in words: `'intptr_t' (aka 'int')`. The 32-bit
+build was never at risk, and now that is a measurement instead of an argument.
+
+One trap, recorded because it will catch the next person: compiling a file *under a
+different filename* changes its `__FILE__`, and `GameInfo.cpp` bakes its filename into a
+diagnostic string, which moves the GOT and shifts `.text` by three bytes. Hold the filename
+constant or the comparison lies to you.
+
+---
+
+## 4. WHAT IS LEFT — 12 FILES, 385 SITES, AND NONE OF THEM UNKNOWN
+
+All one error class. Not one is blocked by the class; each is a distinct piece of work:
+
+| file | sites | what it is |
+|---|---|---|
+| `StageObjects.cpp` | 78 | ~70 are `*(int *)(pRecord + 0xNN) = (int)ptr` — `int` slots **inside game records the game itself reads**. Widening the store without widening the record desynchronises the record. |
+| `StageTiming.cpp` | 74 | the particle texture handles: `LOAD_EFFECT_TEXTURE()` (15 macro sites) feeds 16 `int` globals that go into `ParticleType::field0x38…0x4c`. |
+| `GameInfo.cpp` | 65 | ~32 `g_unk0x… = (int)SomeLookup()` — globals that hold pointers and must go pointer-wide **together with every reader**. |
+| `Car.cpp` | 36 | `pCar = (int)Race_GetPlayerRecordPointer(i)` and friends. |
+| `RallyData.cpp` | 32 | the same shape, record-table handles. |
+| `Sector.cpp`, `Game.cpp` | 23 + 23 | one-shot call interfaces (`Graphics_AccumulateCounterOrInitialize((int)pNodes)`, `Game_DrawSceneViewport(…, (int)g_viewNodes[view], …)`). |
+| `FrontendScreens.cpp` | 17 | save-slot iteration `(int)pRecord < (int)(g_saveSlots + 0x300)` and a few record-handle stores. |
+| `NetRace.cpp`, `Race.cpp`, `CarEffects.cpp` | 13 + 10 + 10 | `Network_SendPlayerMessage(0, 1, (int)&msg, 1)`, `Sector_BuildC3DModelScene((unsigned int)pBuffer, …)`. |
+| `SceneNode.cpp` | 4 | **the one wall I stopped at on purpose.** `pHeader[2] = (int)p` stores a pointer into an array whose *other* elements are read as 32-bit counts (`p += pHeader[1] * 0x30`). Widening that array does not widen a pointer, it changes what the surrounding ints mean — a data-layout decision about a structure the game reads, not a cast fix. |
+
+**No number in this file assumes any of them compiles.**
+
+---
+
+## 5. CARRIED FORWARD (not re-verified this round)
+
+These are other lanes' standing items. I am naming them with their sources so they cannot
+be read as claims I measured tonight:
+
+* **The picture.** The road does not separate from the terrain — the port drops the game's
+  per-vertex colours (`docs/ROAD-r6-REPORT.md`), and the setup-screen car renders collapsed
+  (`docs/MENU-CAR-EVIDENCE.md`). Four named lighting defects are listed in
+  `docs/DEATH-AND-LIGHT.md`. **Not touched this round.**
+* **The launcher and the drive gate** — `tools/drivecheck.sh`, `tools/loopcheck.sh`,
+  `work/PLAY/build-play-lre.sh`. The gate was re-exercised tonight as a side effect of §3
+  and it passed; nothing about it was changed.
+* **The installer** (`docs/INSTALLER.md`) and **controls** (`docs/CONTROLS.md`) — unchanged.
+* **Disk.** The phone already has this framing: 36 GB free of 928 GB, and dedup is hygiene,
+  not a rescue (`ROUND-DISCIPLINE.md` §3). Tonight added one adjacent measurement: **`/tmp`
+  is a 7.3 GB tmpfs at 81 % (5.8 GB used)** — my own scratch filled it and two compiles died
+  on the quota. I moved all scratch under `~/lena/work/RTN-20261012/` and left `/tmp`
+  exactly as I found it (§2 of the same file: report it, never clean it). The frames and
+  `.bmp`s holding it belong to other lanes.
+
+## 6. ONE OF MY OWN MISTAKES, ON THE RECORD
+
+`patch_ptrwidth_tier2_s1.py` was run once without `--apply` and printed `DRY RUN` — and
+wrote anyway, because the write call was not behind the dry-run flag. It cost no
+correctness: every edit it made was then verified, swept and audited as normal. It cost the
+round a clean pre-image of stage 1, and the source backups it left are therefore misnamed in
+the tree. The script is fixed in this repo, the backups are renamed on the Deck, and this is
+written here rather than left to be discovered.
