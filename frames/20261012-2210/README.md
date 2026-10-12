@@ -78,7 +78,7 @@ table if you want it.
 | file | from | what is in it |
 |---|---|---|
 | `B-0927-mainmenu-f2600.png` | `fx-b.ppm.2600` (200 s attract run, 22:05, `RACE/out/fx-b.log`) | Main Menu: `drivers \| rally \| arcade \| network \| options \| credits \| quit`, "Main Menu" top-left, "Time 00:00.28" top-right, the spiral of letters around a white dot. **Flat sage-grey background — no 3D scene behind the menu.** |
-| `B-0927-mainmenu-plus-f2900.png` | `fx-b.ppm.2900` | frame 2900, same run, still the frontend |
+| `B-0927-mainmenu-plus-f2900.png` | `fx-b.ppm.2900` | frame 2900, same run: **still the Main Menu** (`rally` selected, `Time 00:00.00`). Checked by eye, not assumed. |
 | `B-0927-demo-f3000.png` | `v3.ppm.3000`, byte-identical to `PLAYABLE-20261012/png/installed-build.3000.png` | attract demo, high chase camera, real Kenya-style stage: dirt road with ruts, savanna grass, billboard trees, dust plume, the **car body complete** with livery; white spiky stretched polygons on the ground, hard white sky |
 | `B-0927-demo-f3500.png` | `v3.ppm.3500` | same demo, car mid-slide, S-curve road — the frame that closest matches his "a real stage with real surfaces" |
 | `B-0927-demo-f4000.png` | `v3.ppm.4000` | same demo, car into the distance |
