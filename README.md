@@ -33,18 +33,23 @@ game process, no GPU).
 
 ---
 
-> **11 October 2026.** The game boots its own frontend, loads a real Kenya stage off
+> **12 October 2026.** The game boots its own frontend, loads a real Kenya stage off
 > disk, and drives a car with the game's own physics — on this project's renderer, on a
-> Steam Deck. **Four things that were broken are fixed and measured as of today** (see
-> *Recent fixes*): the stage's textures were never decoded, the GPU was being reset by
-> our own code every thirty seconds, the road was drawn from the wrong vertices, and one
-> of our own tools had quietly deleted the two lines that make a car drivable.
+> Steam Deck. **A full stage has been driven start to finish.**
 >
-> **A full stage has been driven start to finish** on this renderer, on a Deck. It is
-> still not *right*: the road does not separate from the terrain — one continuous warm
-> field, white-on-white on snow stages — because the port drops the game's per-vertex
-> colours (measured in `docs/ROAD-r6-REPORT.md`). The setup-screen car also renders
-> collapsed.
+> **Six defects that were killing every run are fixed and measured:** the stage's textures
+> were never decoded; the GPU was being reset by our own code every thirty seconds; the
+> road was drawn from the wrong vertices; one of our own tools had quietly deleted the two
+> lines that make a car drivable; textures **flickered** because no mipmaps were ever
+> built; and near-plane geometry was **smeared across the frame**. Each has a written
+> report in `docs/`.
+>
+> **It is still not *right*:** the road does not separate from the terrain — one
+> continuous warm field, white-on-white on snow stages. **We do not yet know why**, and
+> the honest record of that search is worth more than a clean claim: we tested the obvious
+> cause (the game's per-vertex colours) and *measured that it is not the answer*
+> (`docs/ROAD-r7-REPORT.md`); we tested the lighting term and it came back a 1.0000 no-op
+> (`docs/ROAD-r8-REPORT.md`). The search continues in `docs/STATUS.md`.
 >
 > **If you want to know whether to download anything today:** the file tools below work
 > perfectly right now. The port is a laboratory, not a game.
