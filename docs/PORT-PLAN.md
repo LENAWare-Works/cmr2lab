@@ -136,6 +136,20 @@ the i386 build actually uses.** Without that flag the same sweep reports 64/66:
 `Game.cpp` and `GameInfo.cpp` put values above `INT_MAX` in 32-bit `case` labels.
 `tools/sweep-compile.sh` now passes it and reproduces both counts.)*
 
+**UPDATE 2026-10-12 (the tier-1 pointer pass, `tools/fixes/patch_ptrwidth_tier1.py`).**
+Re-measured tonight with the same harness: **37 / 66 on x86_64** (29 fail), **66 / 66 on
+i386** — the 67th translation unit in the tree is our own `Lenatrace.cpp`, and it passes, so
+the raw sweep prints `PASS 38 FAIL 29 TOTAL 67`. Remaining sites: **1,057**, down from
+1,377. What came in: `TimingUtils.cpp`, `FileBuffer.cpp`, `Mesh.cpp`,
+`NetworkLeaderboards.cpp` — the last of which had been writing zeros through a pointer
+truncated to 32 bits. 308 of the 1,377 sites (22 %) were a single call shape,
+`Sprite_FillRect((int)g_pGraphics + 0x150, …)` in 14 files, into a parameter the function
+never reads. Logs: before `work/STATUS-33-OF-66/sweep-x86_64.log`, after
+`sweep-after-x86_64.log`. **Note what this is not:** the sites can also be made to compile
+by casting to `intptr_t` and letting the value narrow into the `int` parameter, because the
+sweep passes `-w`. That raises the count without making a single pointer whole. Every edit
+here widened a type.
+
 This pair is a diagnostic, not two options:
 
 * **27 files fail on x86_64 and pass on i386** — those 27 are blocked by nothing
@@ -285,6 +299,7 @@ these was reported before it had been run.
 | 463 stubs | 16 placeholders | classifier called accessors stubs |
 | 19/66 compiles | 26/66 x86_64, 53/66 i386 | it had never been run |
 | 26/66 x86_64, 53/66 i386 | **33/66 x86_64, 66/66 i386** after P3+P1 — i386 only with `-Wno-c++11-narrowing` (64/66 without; see §3) | re-measured 2026-10-10 18:20, `docs/P3-P1-REPORT.md`, re-run 18:5x |
+| 33/66 x86_64 (2026-10-10 → 2026-10-12) | **37/66 x86_64** after the tier-1 pointer pass; 1,377 → 1,057 sites (2026-10-12) | it was not wrong, it was *stale-standing*: nothing between the two dates was pointer work. Both sweeps named in §3 |
 | 149 D3D7 calls | 278 call sites / 20 methods | wrong regex, stated anyway |
 | 14 Win32 calls | 45 files include `windows.h` | regex ran without `re.M` |
 | 5 files with `__asm` | 6 files, 35 blocks | per-file count, missed a header |

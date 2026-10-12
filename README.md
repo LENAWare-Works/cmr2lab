@@ -44,10 +44,12 @@ translators that pretend to be Windows so the game doesn't have to change.
 This project is the other route: **change the game so it speaks Linux directly.**
 
 That is a big job and it is going well. The game's source code has been recovered from
-the shipped `.exe` — 122 files, 135,805 lines of C++ — and two thirds of it compiles
-natively on a Steam Deck (33 of 66 translation units on x86_64, 66 of 66 on 32-bit;
+the shipped `.exe` — 122 files, 135,805 lines of C++ — and more than half of it compiles
+natively on a Steam Deck (**37 of 66 translation units on x86_64, 66 of 66 on 32-bit**;
 compile-level counts, and this repo labels them as such, because there is still no
-runtime proof of the port's correctness).
+runtime proof of the port's correctness). The x86_64 figure was **33 at the start of
+12 October and 37 by the end of it** — four files, 320 sites, one afternoon, every edit
+named in [`tools/fixes/patch_ptrwidth_tier1.py`](tools/fixes/patch_ptrwidth_tier1.py).
 
 It also draws, and that sentence has to be exact. The game's data files produce a real
 car, rendered on a Deck through Vulkan — but the **data** is the game's and the **draw
@@ -93,8 +95,8 @@ public rather than deleted (`docs/ROAD-TEXTURE-OWNER.md` §3 and
 | **A car you can actually drive** | ⚠️ **Yes again since 11 Oct 11:02** — our own tool had broken it for 2½ hours | `docs/DRIVE-LOOP-REGRESSION.md` |
 | **Lighting that looks like the original** | ❌ No — the road's per-vertex shading is dropped | `docs/ROAD-r6-REPORT.md` |
 | **The car in the setup screen** | ❌ No — it renders collapsed | `docs/MENU-CAR-EVIDENCE.md` |
-| **Half the game's code compiling for Linux** | ✅ 33 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
-| **The other half compiling** | ❌ Not yet — pointer-width work, 1,377 sites | `docs/P3-P1-REPORT.md` |
+| **More than half the game's code compiling for Linux** | ✅ 37 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
+| **The rest compiling** | ❌ Not yet — pointer-width work, 1,057 sites and falling | `docs/PORT-PLAN.md` |
 
 **Full current status, rewritten whole each round so it cannot contain a stale claim
 above a fresh one: [`progress.md`](progress.md).**
@@ -185,12 +187,26 @@ The decompiled source is **not in this repository.** It is a separate, public,
 GPL-licensed matching decompilation; this repo ships only the tools used to measure it,
 the fixes that came out of it, and the numbers.
 
-**What compiles today:** 33 of 66 translation units on `x86_64-linux-gnu`; 66 of 66 on
+**What compiles today:** **37 of 66** translation units on `x86_64-linux-gnu`; 66 of 66 on
 `i386-linux-gnu` — the second only with `-Wno-c++11-narrowing`, the flag that build
 actually uses. The i386 build is kept deliberately as a **diagnostic oracle**: a file that
 fails on x86_64 but passes on i386 is blocked by pointer width and nothing else, which is
-all 33 of them. Every remaining error is one class — a pointer cast into a smaller integer
-type — at **1,377 sites**. Both counts reproduce with `tools/sweep-compile.sh`.
+all 29 of them. Every remaining error is one class — a pointer cast into a smaller integer
+type — at **1,057 sites**, down from 1,377 on the morning of 12 October. Both counts
+reproduce with `tools/sweep-compile.sh`.
+
+**How the last four came in (12 October).** The 33 failures were not evenly priced. Three
+were a single line each; one was a program that truncated a pointer and then wrote silently
+through the truncated value. And 308 of the 1,377 sites — 22% of the entire remaining work
+— were the *same call*: `Sprite_FillRect((int)g_pGraphics + 0x150, …)`, across 14 files,
+into a parameter the function never reads. One prototype pair and one substitution removed
+all 308. The script is
+[`tools/fixes/patch_ptrwidth_tier1.py`](tools/fixes/patch_ptrwidth_tier1.py) — idempotent,
+every file backed up before it is touched. **And a warning for whoever does the next one:
+the sweep passes `-w`, so any of these sites can be made to compile by casting to
+`intptr_t` and letting the value silently narrow into the `int` it is passed to. That
+raises this number without making a single pointer whole. Every edit above widened a
+type.**
 
 **These are compile-level numbers.** ASAN does not build on this toolchain, so there is no
 runtime evidence about the port's correctness, and this repository will not imply there
