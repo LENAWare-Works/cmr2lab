@@ -1,9 +1,25 @@
 # CMR2LRE
 
-![CMR2LRE](docs/art/banner-1600x400.png)
+![CMR2LRE](assets/hero.png)
 
 **Colin McRae Rally 2.0 — Linux Rally Edition.**
-Running the 2000 PC rally game natively on Linux. No Wine. No Proton. No compatibility layer.
+A 2000 PC rally game, running natively on a Steam Deck. No Wine. No Proton. No emulator.
+The actual engine, recompiled for Linux.
+
+---
+
+### The cars below are not screenshots. We rendered them.
+
+The game's own `.c3d` geometry and `.bfl` liveries, decoded and rasterised by a renderer
+written from scratch in this repo (`assets/` — regenerated from scratch, no 3D engine, no
+game process, no GPU).
+
+| | | | |
+|---|---|---|---|
+| ![Subaru Impreza WRC](assets/car-subaru.png) | ![Ford Focus WRC](assets/car-focus.png) | ![Peugeot 205 T16](assets/car-205.png) | ![MG Metro 6R4](assets/car-6r4.png) |
+| **Subaru Impreza WRC** | **Ford Focus WRC** | **Peugeot 205 T16** | **MG Metro 6R4** |
+| read off the retail disc | real livery, real UVs | our own rasteriser | no engine, no emulator |
+
 
 > ### New here? Start with these three.
 >
