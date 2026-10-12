@@ -143,3 +143,13 @@ write a file whose pixels do not round-trip. Full size throughout.
 
 **Disk hygiene:** `~/lena/work/ROUND-DISCIPLINE.md` applies. `cmr2lab-publish/frames` is
 published output and is never swept or deduped.
+
+### `20261012-2230-diff/` — the two regression pairs, as amplified differences
+
+Made to answer one question: were the "worse than before" frame pairs even the same moment?
+`diff-demo3000-amp4.png` and `diff-race-amp4.png` are 4x amplified per-pixel differences
+(white = large difference). Read `20261012-2230-diff/README.txt` beside them, and
+[`../docs/NOISE-20261012.md`](../docs/NOISE-20261012.md) for the numbers: the demo pair
+differs in 98.6 % of pixels at the same frame index, so the 3.8x speckle figure is content,
+not noise -- while the one pair that IS the same moment (the main menu, frame 2600) shows
+identical speckle on both builds.

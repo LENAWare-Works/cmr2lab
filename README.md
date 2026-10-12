@@ -305,6 +305,14 @@ ever again starting a build that cannot drive (`tools/drivecheck.sh`,
 
 In rough order, and every item here is a real plan rather than a wish:
 
+0. **Settle the 3D noise question** — "worse than before" was argued with speckle ratios
+   (3.8x, 2.7x) measured between frames that are **not the same moment** (78-84 % of pixels
+   differ by >8 luma; one binary alone moves speckle 4.76x between two runs). On the only
+   content-matched pair the two builds are identical: 0.091 % speckle each, ratio 1.000.
+   Open question, not a defect -- next measurement is the in-process `LENA_ALIGNTRIG` A/B on
+   a static 3D frame. Numbers, controls and the instrument:
+   [`docs/NOISE-20261012.md`](docs/NOISE-20261012.md),
+   [`frames/20261012-2230-diff/`](frames/20261012-2230-diff/).
 1. **Make the picture right** — the lighting defects (§2 of
    `docs/DEATH-AND-LIGHT.md`), then the near-plane blow-up that owns the frame.
 2. **The GUI installer** — one download, one click, no terminal. The destination.
