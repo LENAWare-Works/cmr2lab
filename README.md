@@ -31,7 +31,7 @@ game process, no GPU).
 >
 > Then come back here — the rest of this page is the detail behind those three.
 
-> **Just want to LOOK at the game?** → **[`frames/README.md`](frames/README.md)** — every frame
+> **Just want to LOOK at the game?** → **the screenshots in this README**
 > published so far, full-size 1280×800 PNG, no downscale: the 09:27 build he called
 > *"amazing"* next to tonight's, plus frames of his own live session. Open them directly;
 > nothing there is a mock-up.
@@ -105,7 +105,7 @@ Nothing here is a mock-up and nothing here is a rendering of what we hope it wil
 like. Where a number appears in this repository, the log, tool or command that produced
 it is named next to it — and where a claim turned out to be wrong, it was withdrawn in
 public rather than deleted (`docs/ROAD-TEXTURE-OWNER.md` §3 and
-`docs/README-ARCHIVE.md` both do this).
+the public documentation both do this).
 
 ---
 
@@ -184,7 +184,7 @@ That's the whole safety argument for editing your own copy.
 (An earlier version of this page quoted the install at 2.26 GB. It is not: **2.26 GB was
 three copies of the disc image in a download folder.** A real retail install measures 907
 files, **638 MB** on disk, and the 582 `.bfl` files inside it are 417 MB. The withdrawal
-is recorded in `docs/README-ARCHIVE.md` rather than quietly edited away.)
+is recorded in the public status record rather than quietly edited away.)
 
 ---
 
@@ -312,7 +312,7 @@ In rough order, and every item here is a real plan rather than a wish:
    Open question, not a defect -- next measurement is the in-process `LENA_ALIGNTRIG` A/B on
    a static 3D frame. Numbers, controls and the instrument:
    [`docs/NOISE-20261012.md`](docs/NOISE-20261012.md),
-   [`frames/20261012-2230-diff/`](frames/20261012-2230-diff/).
+   the recorded comparison in the status report.
 1. **Make the picture right** — the lighting defects (§2 of
    `docs/DEATH-AND-LIGHT.md`), then the near-plane blow-up that owns the frame.
 2. **The GUI installer** — one download, one click, no terminal. The destination.
@@ -349,7 +349,7 @@ In rough order, and every item here is a real plan rather than a wish:
 | `docs/C3D.md` | the `PP_F` 3D geometry format |
 | `docs/PORT.md`, `docs/PORT-PLAN.md` | the native port: overview, error census, withdrawn numbers |
 | `docs/GLOSSARY.md` | **every term in this repo, in plain English** |
-| `docs/progress-archive.md` | the dated append-log, mistakes included, kept verbatim |
+| `docs/STATUS.md` | current status and known limits |
 | `tools/` | the analysis scripts behind the numbers |
 | `tools/build_art.py` | regenerates the public-face art from the game's own FrontEnd textures — nothing drawn by hand |
 | `docs/INSTALLER.md` | what the installer got wrong, what is verified now, and the one defect found in the pair |
