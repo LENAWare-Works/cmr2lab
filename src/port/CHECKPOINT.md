@@ -407,7 +407,7 @@ originals:  CMR2.exe is PE32 i386, 1.24 MB, the decomp reference
 
 # 10. NEW DIRECTION — NATIVE PORT IS THE PLAN. PROTON IS CLOSED. (appended, not rewritten)
 
-**Added after the M4 census. Full detail in [`docs/PORT-PLAN.md`](../docs/PORT-PLAN.md) — read that
+**Added after the M4 census. Full detail in [`docs/PORT-PLAN.md`](../../docs/PORT-PLAN.md) — read that
 first, this is the summary and the redirect.**
 
 ## The redirect, stated once
