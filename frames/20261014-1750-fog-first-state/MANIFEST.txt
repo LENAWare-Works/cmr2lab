@@ -1,0 +1,32 @@
+# MANIFEST -- 20261014-1750-fog-first-state
+
+binary: run/fog-ab-run3  .text md5 15d44180f4286a448e84932f99a07fed
+base: his recovered 94ed1359 link inputs (obj-epoch + plat-fix) + this round's two RHI objects
+ring gfx_0.0.0 timeout delta: 0
+windows on his desktop: 0
+
+6da3b9ae89b58f6c4a407e6ed845b62a  forced-fogC/pair00_fogOFF_frame3400.png
+adcdb34fb36e9a11f9fe6c65bbc85ae4  forced-fogC/pair00_fogON_frame3402.png
+7e4ef05f83601ebb540d19fe2bb9be2f  forced-fogC/pair01_fogOFF_frame3404.png
+adcdb34fb36e9a11f9fe6c65bbc85ae4  forced-fogC/pair01_fogON_frame3402.png
+7e4ef05f83601ebb540d19fe2bb9be2f  forced-fogC/pair02_fogOFF_frame3404.png
+fe9a9fb1d1929180dbc57c948af262d7  forced-fogC/pair02_fogON_frame3406.png
+2b07f32ba1ff82b820b9904744f50ba9  forced-fogC/pair03_fogOFF_frame3408.png
+fe9a9fb1d1929180dbc57c948af262d7  forced-fogC/pair03_fogON_frame3406.png
+2b07f32ba1ff82b820b9904744f50ba9  forced-fogC/pair04_fogOFF_frame3408.png
+37ebe0e660cbbe7f0c7d36f6bffb9d79  forced-fogC/pair04_fogON_frame3410.png
+d59badedf372d723d414777c404d96ce  forced-fogC/pair05_fogOFF_frame3412.png
+37ebe0e660cbbe7f0c7d36f6bffb9d79  forced-fogC/pair05_fogON_frame3410.png
+94f6b36262ce4a6c0cf514a391cbb925  unforced-fogD/pair00_fogOFF_frame3400.png
+9f6b49b206566261f627448abfdb27c2  unforced-fogD/pair00_fogON_frame3402.png
+85c99b2dea88e582f2abc49c2f311361  unforced-fogD/pair01_fogOFF_frame3404.png
+9f6b49b206566261f627448abfdb27c2  unforced-fogD/pair01_fogON_frame3402.png
+85c99b2dea88e582f2abc49c2f311361  unforced-fogD/pair02_fogOFF_frame3404.png
+e3c1ca7d703091f4dcf657004ea58ad3  unforced-fogD/pair02_fogON_frame3406.png
+aded4979604f0204b409be1f85d4fe8a  unforced-fogD/pair03_fogOFF_frame3408.png
+e3c1ca7d703091f4dcf657004ea58ad3  unforced-fogD/pair03_fogON_frame3406.png
+aded4979604f0204b409be1f85d4fe8a  unforced-fogD/pair04_fogOFF_frame3408.png
+b69b4e7de1c02b67141132e6c30f20c1  unforced-fogD/pair04_fogON_frame3410.png
+7abcba59812fbc2ac4a795581ba28a35  unforced-fogD/pair05_fogOFF_frame3412.png
+b69b4e7de1c02b67141132e6c30f20c1  unforced-fogD/pair05_fogON_frame3410.png
+1ce695f7f24a67514ac8e1ae03db2725  rowmean-luma-profile_forced.png
