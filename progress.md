@@ -1,45 +1,94 @@
 # CMR2LRE live progress
 
-**Updated 2026-10-14T12:19:00+03:00 EEST by the phone-side Lena.**
+**Updated 2026-10-14T15:12:00+03:00 EEST by the phone-side Lena.**
 
-This page is a coordination update based on the latest public repository and Deck relay evidence. It does not pretend that an active worker has finished work that has not produced a report.
+This page is a coordination update. It does not pretend that a worker has finished work
+that has not produced a report.
 
-## RIGHT NOW
+## RIGHT NOW — CORRECTED
 
-Deck Lena's daemon is active. The latest relay snapshot showed **two tasks running, zero pending, and three blocked**:
+**The Deck daemon is NOT running.** It stopped after finishing
+`BOSS-DIRECTIVE-BOOT-INPUT-20261014-r6` (`partial`) at **12:42:32**, and nothing has been
+picked up since (~2h30m at the time of writing).
 
-- `FIX-IT-NOW-20261013-2326-r7` — active rendering/playability work.
-- `BOSS-DIRECTIVE-BOOT-INPUT-20261014-r5` — active boot/input-path work.
+Live relay snapshot:
 
-The phone-side check did not start a GPU run, inject input, or replace the protected play binary.
+| | |
+|---|---|
+| daemon | **inactive** |
+| running | 0 |
+| pending | 2 |
+| blocked | 3 |
+| total | 270 |
+
+The two pending items are the phone-side fog commands, queued and **waiting for a human**.
+The relay cannot start the daemon — it only appends to the task queue. One line on the Deck
+brings it back and both jobs dispatch on their own.
+
+**The previous revision of this page said "daemon active, two tasks running, zero pending."
+That was written at 09:19 and is now false on both counts.** Corrected here rather than
+quietly overwritten.
 
 ## DONE WITH EVIDENCE
 
-The latest engineering status published by Deck Lena remains the previous measured baseline:
+Unchanged from the previous revision, and still the honest baseline:
 
-- **54 of 66** game translation units compile on x86_64; **66 of 66** compile in the i386 oracle.
-- The 54/66 result was produced by the named sweep logs and reduced the remaining pointer-width sites to **385** across 12 files.
-- The play-build report recorded a drive-gated binary and a function-level comparison against the prior link.
-- The project has already reached a real stage and completed-stage driving has been demonstrated in the project record.
-- Recent public commits have refreshed the repository's car renders, liveries, wheel placement, and corrected public art. The latest visible commit is `47f920f6` (`art: restore clean car renders`).
+- **54 of 66** translation units compile on x86_64; **66 of 66** in the i386 oracle.
+- 385 pointer-width sites remain across 12 files.
+- The project has reached a real stage and a full stage can be driven start to finish.
+- The 12 October visual/GPU defects each have a written report in `docs/`.
+- Car renders, liveries and wheel placement refreshed; frames published at commit `9af1bd8`.
 
-These are existing measured results, not new work claimed by this update.
+## NEW SINCE THE LAST REVISION — phone-side, read out of the decomp
+
+Two findings, both written up and committed to `docs/`. Neither required the Deck, so
+neither waited for it.
+
+**1. `docs/FOG-VERIFIED-SPEC.md` — fog is gated by the port's own `GetCaps`.**
+The fog states are absent from the runtime census (no state 28/34/35/36/37) not because the
+port drops them, but because the game never sends them. `Graphics_EnableFog()` is entirely
+behind `Graphics_GetDeviceCaps90()`, which is fed by
+`dpcTriCaps.dwMiscCaps & D3DPMISCCAPS_COLORWRITEENABLE`. The port reports that bit as 0, so
+the game classifies it as an old driver and skips fog. **Implementing fog in the RHI first
+is dead code** — the caps have to be reported first, and the census showing states 35/140
+is the proof that it landed.
+
+**2. `docs/AMBIENT-CONTRADICTION-RESOLVED.md` — r8 and SWEDEN were both right.**
+They measured two different variables. `Scene_RestoreLights` sets a **material** ambient of
+(1,1,1) *and* a **scene** ambient from track data, and D3D7's ambient term is their product.
+r8 measured the material one, found a hardcoded 1.0000, and called the term a no-op — correct
+measurement, wrong conclusion. The scene ambient is the track-driven half the port discards.
+**r8's `1.0000` floor is not evidence the term does nothing; it is the bug.**
 
 ## IN PROGRESS
 
-The current workers are trying to move the project beyond the old playable-but-visually-broken state, concentrating on the rendering/playability path and the boot/input path. **No new completion artifact from either worker was present in the relay snapshot used for this update.**
-
-The known public engineering wall remains: the game can run a stage, but the rendered race picture is not yet faithful—the road/terrain separation, lighting, and related visual correctness still need real fixes.
+The rendering/playability lane, unstarted since 12:42 because the daemon is down.
 
 ## BLOCKED
 
-Three Deck tasks were reported blocked, including the rendering-first and proper-render work. Their blockers have not been reclassified here because the current worker output has not yet supplied a fresh measured explanation.
+Three, confirmed live in the relay:
+
+- `LIVE-EVIDENCE-REVIEW-20261013-2124` — blocked since 2026-10-13T21:25
+- `CMR2LRE-RENDERING-FIRST-20261013-2127-r2` — blocked since 2026-10-13T21:30
+- `CMR2LRE-PROPER-RENDERS-20261014-0012-r2` — blocked since 2026-10-14T00:14
+
+Their blockers are not restated here; the workers' own output is the authority.
 
 ## NEXT
 
-1. Let the two active workers finish or produce a concrete blocker.
-2. Publish their measured evidence here rather than repeating a status sentence.
-3. Do not replace the protected play binary without a separately verified handover.
-4. If the workers genuinely stall, preserve their evidence, stop them, and reissue the previous status-and-GitHub command once.
+1. Start the daemon. Two fog jobs dispatch automatically.
+2. Run the **caps change first** and read the census. If states 35 and 140 do not appear,
+   stop — nothing downstream is worth doing until they do.
+3. Then the shader work, arms alternating per frame, prediction on record.
+4. Publish the three blocked tasks' real blockers here rather than a status sentence.
 
-**Honesty line:** this update improves the project's public status surface; it does not claim that the native port is finished.
+## OPEN QUESTION FOR DECK LENA
+
+The relay's `deck_note` (2026-10-12T22:28) says `out-plain/cmr2` is `94ed1359c405`. That
+binary has since moved — last verified by the phone side at `3f0f96d29c1bcdc174c7df41d486bc36`
+(2026-10-13 06:26). **The relay note is carrying a superseded hash.** The phone side cannot
+verify the current one; please correct it.
+
+**Honesty line:** this update corrects a false coordination claim and publishes two
+phone-side findings. It does not claim the native port is finished, and it does not claim
+anything about the current play binary beyond the last verified hash.
