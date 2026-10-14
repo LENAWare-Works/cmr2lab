@@ -1,9 +1,104 @@
 # CMR2LRE live progress
 
-**Updated 2026-10-15T00:20:00+03:00 EEST by the phone-side Lena.**
+**Updated 2026-10-15T00:40:00+03:00 EEST by the phone-side Lena.**
 
 This page is a coordination update. It does not pretend that a worker has finished work
 that has not produced a report.
+
+## 2026-10-15 ~00:40 EEST — THE ROAD SEPARATES FROM THE TERRAIN
+
+**This is the wall that has stood since 2026-10-05, and it is down.**
+
+Measured on the promoted near-clip build (`1c0bee6a`), keyless attract route, one run,
+ring `gfx_0.0.0` timeout delta **0**, **zero keys injected**. Eight captures; `03_race`
+through `07_race_e` are a real race entered by the game's own attract route.
+
+`road_edge` — the same metric used for the Sweden snow stage:
+
+| frame | `road_edge` | note |
+|---|---|---|
+| `03_race` | 0.486 | camera pitched up, sky in frame |
+| `04_race_b` | **6.985** | |
+| `05_race_c` | 1.427 | camera straight down |
+| `06_race_d` | **7.901** | |
+| `07_race_e` | 1.515 | |
+
+Against the record: **Sweden's undrivable white-on-white was 1.04 mean / 0.96 median.**
+Round 5's race frames sat at ≈0.95 with 66-77 % of the frame in one luma octile. **Two of
+five race frames now measure 6.99 and 7.90 — above Kenya's 4.93.**
+
+Three independent tests agree:
+
+1. **Colour separation.** Frame 03's ground is 8 coherent dirt materials in one ochre
+   family (`#986828` 18.8 %, `#a87828` 12.8 %, `#986818` 12.1 %) with runs up to 184 px
+   and 121 luma between the top two. A wash is one material with no contrast.
+2. **The edge tracks.** The strongest adjacent-row step moves **monotonically** from
+   x≈700 at y460 to x≈580 at y580. That is a road edge receding, not speckle.
+3. **Independent measurement, different code.** The phone side pulled the raw frames and
+   measured ground `|dL/dx|` directly: frame 03 = **1.68**, frame 04 = **14.50** — 8.6×
+   more structure. Same direction, same verdict, separate implementation.
+
+And a vision pass on frame 04 reads it as a dirt track with edges distinct from the
+terrain, running from the lower-right foreground, curving left, continuing to the upper
+right — with a solid, textured car on it.
+
+### The honest half
+
+- **The road does not yet recede to a horizon.** `converge` is +0.31 / +0.14 / +0.85 —
+  positive, a real tendency, but weak and inconsistent. You can see the road under you;
+  you cannot yet see it *going* anywhere. The best edges in frame 07 run *across* the
+  frame, not into it.
+- **The ground reads poorly from directly above** (frame 06: 8 materials at `run_med=13`).
+  Same road, worse angle — not a second defect.
+
+## THE NEW #1 DEFECT: THE SKY IS CLIPPED TO PURE WHITE
+
+The white band is not where it was. The old y500-600 finding **does not reproduce** — the
+object it was measured over (`#cbccce`) is not in these frames, and the near clip that was
+excluded as its cause is now actually fixed.
+
+What is there is larger, unambiguous, and at the **top**:
+
+```
+now.03_race:  >=250 = 9263 px = 9.05 % of frame
+              all of it in the sky band; 0 px in every band below
+              80 rows of EXACT 255, hard step at both ends
+              >=250 and >=240 counts nearly equal (9263 vs 9716)
+              = nothing between 240 and 250, no soft falloff
+```
+
+**Confirmed independently:** the phone side measures **63.4 %** of the top 80 rows at
+exactly 255 in frame 03 and **0.0 %** in frame 04.
+
+It is **world-locked, not a screen overlay** — proved by the other frames. Top-80-row mean
+luma: `02_pre 172.6`, `03_race 214.1`, `04 105.1`, `05 60.5`, `06 92.3`, `07 93.5`. The
+white appears **only** when the camera pitches up enough to see sky, and vanishes entirely
+when it looks down. A screen-space effect cannot do that.
+
+**It is the skybox, and it is being crushed to `#ffffff`.** Same failure shape that made
+Sweden undrivable, relocated from the ground to the sky. His eye needs the horizon to read
+attitude; right now the horizon is a hard step from `#ffffff` to `#808e94`.
+
+**Not the near clip** — measured after the fix, and it dies when the camera pitches down.
+
+## THE CAR IS THE BEST-RENDERED THING IN THE FRAME
+
+Worth saying plainly. The edge map puts the car's silhouette, both wheel arches, the door
+number and the livery as the **clearest closed contour in the image** — sharper than
+anything in the terrain. Whatever is still on the list, the car is not on it.
+
+And the frontend path is working end to end: menu car, **setup** and **repair** screens all
+render, confirmed by Miami directly.
+
+## Handover
+
+**None.** This round measured the promoted build as it stands — nothing built, nothing
+modified, the play path never opened for write, `gold/` untouched. The next round
+investigates the skybox material.
+
+**Honesty line:** this section claims the road separates from the verge, measured three
+ways. It does **not** claim the road recedes to a horizon, and it does not claim the
+picture is finished — the sky is still a white rectangle in a fifth of the frames.
 
 ## 2026-10-15 ~00:20 EEST — THE NEAR CLIP IS LIVE, THE AMBIENT IS DEAD, AND THE PLAY PATH CAN NO LONGER BE SILENTLY SWAPPED
 
