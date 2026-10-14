@@ -7,77 +7,102 @@ down. Every line below is quoted from source. Nothing here is inferred from a re
 dropped state, implement it." The runtime census in `docs/S2-CENSUS.md` says something
 sharper, and §1 is the correction. Read §1 before anything else.
 
+**Corrected AGAIN, 2026-10-14 evening — the first §1 overclaimed, and it was my error.** It
+said the capability bit was *the* gate on fog, i.e. that fixing caps would make fog appear.
+That is false. Caps gates fog's **range and mode**. It has never gated fog's **enable**. The
+enable comes from the track's own lighting data, on a path with no caps call in it at all.
+§1 is rewritten below.
+
+The caps fix was still correct and worth doing — it is why states 35/140/36/37 now arrive,
+which is measured. But it was never what was keeping fog off. Two different facts; the first
+version of this file merged them, and merged them in the direction that would have sent the
+next round looking at the device caps for a value that lives in the track file.
+
 ---
 
-## 1. THE REAL GATE — THE PORT ITSELF TURNS FOG OFF (READ THIS FIRST)
+## 1. TWO PATHS. ONLY ONE OF THEM IS CAPS-GATED.
 
-`S2-CENSUS.md` §4.1 lists what the port actually drops at runtime:
+### Path A — the ENABLE (`D3DRENDERSTATETYPE` 28 / `0x1c`). NOT caps-gated.
 
-```
-DROPPED render states (raw state: calls):
-  136:9049   141:4525   145:4525   2:1  4:1  8:1  33:1  41:1  138:1  146:1  147:1  148:1
-```
+    Race.cpp:760           StageObject_SetLighting(g_unk0x00538238, g_unk0x00538234)
+    StageObjects.cpp:5097  g_stageLighting[0x25] = pPrimary->field_0x14
+                           g_stageLighting[0x26] = pPrimary->field_0x18
+                           g_stageLighting[0x52] = pSecondary->field_0x14
+                           g_stageLighting[0x53] = pSecondary->field_0x18
+    StageObjects.cpp:5293  if (all four == 0) StageObject_SetForwardedFlareState(0);   // OFF
+                           else              StageObject_SetForwardedFlareState(1);   // ON
+    StageObject_SetForwardedFlareState  (0x00492fd0)
+        -> Graphics_SetFlareStateValue  -> g_unk0x00816704
+    Game.cpp:2662          SetRenderState(0x1c, Graphics_GetFlareStateValue())
 
-**No 28. No 34. No 35. No 36. No 37. Not one fog state.** Every fog state has a source
-site in the game (`S2-CENSUS.md` §4 table) and **zero runtime calls**.
+**There is no `GetDeviceCaps` call anywhere in that chain.** The enable is a *stage-data*
+property — four slots taken from the track's lighting presets. The struct:
 
-That is not the port dropping them. That is the game choosing not to send them — because
-the port told it fog is unsupported.
+    struct StageLightPreset {
+        FixVector dir;       // 0x00
+        int field_0xc;
+        int field_0x10;      // 0x10
+        int field_0x14;      // 0x14  -> g_stageLighting[0x25] / [0x52]
+        int field_0x18;      // 0x18  -> g_stageLighting[0x26] / [0x53]
+        BYTE colour[11][4];  // 0x1c
+    };
 
-`CGraphics::CacheRenderDeviceCapabilities` (0x004b7210) copies the device's real caps into
-the game's own descriptor:
+Both preset pointers are filled by `StageObject_BlendSettingPairRecords` (Race.cpp:4385) from
+the stage's own setting records. Note the call at Race.cpp:760 passes them in the order
+`(g_unk0x00538238, g_unk0x00538234)`, while Race.cpp:4389-4390 assigns
+`pPrimary = g_unk0x00538234`. **The two pointers are swapped between those two sites** —
+worth one line of checking before anyone reasons about "which preset is primary".
 
-```c
-m_pTextureManager->pD3D->GetCaps(&d3ddesc);          // <- PORT-SUPPLIED
-...
-if ((d3ddesc.dpcTriCaps.dwMiscCaps & 0x80) != 0)     // D3DPMISCCAPS_COLORWRITEENABLE
-    m_d3dDeviceDesc7.field0x90 = 1;                  // <- GetDeviceCaps90()
-if ((d3ddesc.dpcTriCaps.dwRasterCaps & 0x100) != 0)  // D3DPRASTERCAPS_FOGTABLE
-    m_d3dDeviceDesc7.field0x94 = 1;                  // <- GetDeviceCaps94()
-```
+**What the Deck measured:** state 28 set **24,369 times, `uniq=1`, every value 0**, across a
+full race stage. That is not the port blocking fog. That is the enable path running correctly
+while the *stage data* says "no fog." A caps fix could not have changed that, and did not.
 
-And the only gate that matters is on `field0x90`:
+### Path B — the RANGE and MODE (35, 140, 36, 37). THIS is caps-gated.
 
-```c
-void Graphics_EnableFog(void)                        // 0x004bcbb0
-{
-    if (Graphics_GetDeviceCaps90() != 0) {           // <-- ENTIRE BODY IS BEHIND THIS
-        SetRenderState(D3DRENDERSTATE_FOGTABLEMODE,  D3DFOG_NONE);
-        SetRenderState(D3DRENDERSTATE_FOGVERTEXMODE, D3DFOG_LINEAR);
-        SetRenderState(D3DRENDERSTATE_FOGSTART, *(DWORD *)&g_fogStart);
-        SetRenderState(D3DRENDERSTATE_FOGEND,   *(DWORD *)&g_fogEnd);
+    void Graphics_EnableFog(void)          // 0x004bcbb0 — sets 35, 140, 36, 37
+    {
+        if (Graphics_GetDeviceCaps90() != 0) {      // <- the gate, and it is real
+            ...
+        }
     }
-}
-```
+    void Graphics_DisableFog(void)         // 0x004bcc20 — sets 35, 140
+    {
+        if (Graphics_GetDeviceCaps94() != 0 || Graphics_GetDeviceCaps90() != 0) { ... }
+    }
 
-`GetCaps` returns a zeroed `dwMiscCaps` => `field0x90` stays 0 => **`Graphics_EnableFog()`
-is a no-op** => `FOGSTART`/`FOGEND`/`FOGVERTEXMODE` are never sent => the port has nothing
-to drop, and a render is unchanged.
+`CGraphics::CacheRenderDeviceCapabilities` (0x004b7210) feeds both getters from the caps the
+**port** supplies:
 
-### THE CONSEQUENCE FOR THE ROUND
+    m_pTextureManager->pD3D->GetCaps(&d3ddesc);          // <- PORT-SUPPLIED
+    if ((d3ddesc.dpcTriCaps.dwMiscCaps  & 0x80) != 0)    // D3DPMISCCAPS_COLORWRITEENABLE
+        m_d3dDeviceDesc7.field0x90 = 1;                  // <- GetDeviceCaps90()
+    if ((d3ddesc.dpcTriCaps.dwRasterCaps & 0x100) != 0)  // D3DPRASTERCAPS_FOGTABLE
+        m_d3dDeviceDesc7.field0x94 = 1;                  // <- GetDeviceCaps94()
 
-**Implementing fog in the RHI first is dead code and will measure as "no change."**
+With both bits zero, `EnableFog`/`DisableFog` are no-ops and 36/37 are never sent — so even a
+stage that DID enable fog would have had no range for the port to apply. That is a real bug
+and it is fixed.
 
-Order is:
+### Which is which, stated plainly
 
-1. **Port `IDirect3D7::GetCaps` and set `dpcTriCaps.dwMiscCaps |= 0x80`
-   (`D3DPMISCCAPS_COLORWRITEENABLE`) and `dpcTriCaps.dwRasterCaps |= 0x100`
-   (`D3DPRASTERCAPS_FOGTABLE`).**
-2. *Then* the game starts sending fog states. Confirm it: state 35 and state 140 should
-   appear in the census with non-zero counts, where today they are absent.
-3. *Then* map and honour them, and have the shader read them.
+- **The caps fix was correct and productive.** It landed, and 35/140/36/37 now arrive —
+  measured. Keep it.
+- **It was never what kept fog off.** Fog is off because the stage data does not enable it.
+  Two different facts. The first version of this file merged them.
+- **"Implementing fog in the RHI first is dead code" was wrong.** It is the opposite kind of
+  wrong from a harmless one: it framed a *range* bug as an *enable* bug.
 
-Step 2 is a measurement that costs nothing and proves step 1 landed. **If the census still
-shows no state 35/140 after the caps change, stop — the caps are not reaching the game and
-nothing downstream is worth doing.**
+### Order of work, corrected
 
-The proxy is deliberate on the game's part: a 1999 title gating vertex fog on
-`COLORWRITEENABLE` is a studio using "does this driver expose a modern misc cap" as a
-stand-in for "is this a real driver." The port is being classified as an old driver and is
-being served the old path. Whether the bit is *correct* is beside the point — the game reads
-it, so the port has to answer it.
-
----
+1. **Done, keep it:** `GetCaps` reports both bits. Confirmed by census (35 and 140 arrive).
+2. **NOW — and it is cheap:** does state 28 ever go non-zero, in *any* stage? Instrument the
+   enable value per frame and run more than one stage (the attract route walks
+   Kenya -> Sweden -> Greece by itself in ~5 minutes, no keys). If state 28 is 0 in every
+   stage, fog is a dead feature in retail CMR2 and leaves the suspect list with evidence.
+3. **Only if some stage enables it:** check whether `field_0x14`/`field_0x18` are non-zero in
+   the port's own loaded setting record. Non-zero there while slot 0x25 stays 0 means the port
+   is dropping them — *that* would be a port bug, and a different one from the caps.
+4. **Then** the shader work. The term is already written and measured working when forced.
 
 ## 2. STATE 28 IS THE ENABLE — AND THE DECOMP WRITES IT AS RAW HEX
 
@@ -90,9 +115,9 @@ sites. **Grep for `0x1c`.**
 | where | value |
 |---|---|
 | `Graphics.cpp:1895` `ConfigureDefaultRenderStates` | `0x1c, 0` — fog OFF at device init |
-| `Game.cpp:2643` | `0x1c, Graphics_GetFlareStateValue()` — the live per-frame enable |
-| `Game.cpp:2669` | `0x1c, 0` — off for the 2D/billboard pass |
-| `Game.cpp:2689` | `0x1c, 0` — off for the 2D layer pass |
+| `Game.cpp:2662` | `0x1c, Graphics_GetFlareStateValue()` — the live per-frame enable |
+| `Game.cpp:2688` | `0x1c, 0` — off for the 2D/billboard pass |
+| `Game.cpp:2708` | `0x1c, 0` — off for the 2D layer pass |
 
 Fog is toggled **several times per frame**. Per-draw state, not a global.
 
@@ -205,8 +230,9 @@ colour = mix(FOGCOLOR, lit_colour, f)
 
 ## 8. THE SIX IMPLEMENTATION CONSTRAINTS
 
-1. **`GetCaps` must report the two cap bits, or the game never sends fog (§1).** Nothing
-   downstream matters until this lands and the census shows states 35/140.
+1. **`GetCaps` must report the two cap bits, or the game never sends fog's RANGE and
+   MODE (§1, Path B).** DONE — the census shows 35/140 arriving. Note the corrected limit:
+   this fixes the range, *not* the enable. The enable is Path A and is stage-driven.
 2. **State 28 is the enable. Grep `0x1c`, not `FOGENABLE`.**
 3. **FOGSTART / FOGEND arrive as FLOAT BITS inside a DWORD.** The game does
    `SetRenderState(..., *(DWORD *)&g_fogStart)`. `memcpy` the bits back into a float.
@@ -223,8 +249,14 @@ colour = mix(FOGCOLOR, lit_colour, f)
 ## 9. PREDICTION (pre-registered, so it can be wrong)
 
 - **Census first:** after the caps change, states 35 and 140 must appear with non-zero
-  counts. Today they are absent. If they are still absent, the caps are not reaching the
-  game — stop and report that, do not proceed to shader work.
+  counts. **RESULT 2026-10-14: they do.** `FOGVERTEXMODE (140) = 3 (LINEAR)`, 17,952 calls;
+  `FOGTABLEMODE (35) = 0 (NONE)`, 17,952 calls; 36/37 arrive where round 1 measured them
+  absent. The caps fix landed and worked.
+- **The real open question, and it is the one that decides whether fog matters at all:**
+  does state 28 ever go non-zero, in any stage? Measured so far: **0 in 24,369 calls,
+  `uniq=1`, one stage.** If it is 0 in every stage, fog is a dead feature in retail CMR2 and
+  leaves the suspect list with evidence rather than with an assumption. If some stage enables
+  it, that stage is the only one where the range work matters.
 - **Kenya** — far terrain should stop matching near terrain; the one-warm-hue-family
   measurement should break up.
 - **Sweden** — sharpest detector. Snow albedo 0.85-1.0 lands on 255 with no fog. Expect a
