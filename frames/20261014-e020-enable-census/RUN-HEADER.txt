@@ -1,0 +1,20 @@
+=== 2026-10-14T20:34:37+03:00  tag=enablecensus  secs=420 ===
+BINARY : /home/deck/lena/work/FOG-IS-THE-FIRST-STATE-20261014/enable-census-cmr2 md5=6f75655f0abcee94e8305183857bc393
+HIS BIN: /home/deck/lena/work/PLAY/out-plain/cmr2 md5=8dbc7339c23a36b14cfef2571558c315  (NOT touched)
+CENSUS : DECK_ENABLE_CENSUS=1  (state 28, per stage)  NO A7VK_FOGFORCE, NO A7VK_SNAP
+ROUTE  : attract, no keys injected, no synthetic input of any kind
+--- enablecensus ended 2026-10-14T20:41:44+03:00 ---
+his binary md5 before/after : 8dbc7339c23a36b14cfef2571558c315 / 8dbc7339c23a36b14cfef2571558c315  UNCHANGED
+windows on :0               : 0   (0 required)
+ring timeout delta          : 0   (0 required)
+RHI up                      : 1
+census armed                : 1
+[RT F] frames               : 10977
+race states                 :       7 state=0       1 state=13       5 state=5   10670 state=8     294 state=9 
+stage-load signal (SMR)     : 0
+car moving frames           : 10542
+panics / signal 11          : 0 / 0
+--- THE CENSUS ---
+[ENABLE] total line         : [ENABLE] TOTAL calls=28370 nonzero=0
+[ENABLE] in-stage line      : [ENABLE] IN-STAGE (epoch>=1) stages=3 calls=25626 nonzero=0
+[ENABLE] verdict            : [ENABLE] VERDICT: state 28 is ZERO in EVERY stage measured (3 stage(s)). Fog is a dead feature in retail CMR2 on these tracks.

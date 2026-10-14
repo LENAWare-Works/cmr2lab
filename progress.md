@@ -5,6 +5,47 @@
 This page is a coordination update. It does not pretend that a worker has finished work
 that has not produced a report.
 
+---
+
+## 2026-10-14 ~20:50 EEST — THE ENABLE CENSUS: FOG IS ANSWERED
+
+The measurement the corrected spec's step 2 asked for has been made, and it came back **zero in
+every stage**. Instrumented the value passed at the live state-28 site (`Game.cpp:2709`,
+`SetRenderState(0x1c, Graphics_GetFlareStateValue())`) and ran the attract route with **no keys
+injected, no forced fog, no synthetic input of any kind** — 420 s.
+
+```
+[ENABLE] frames=17422 stages=3 mesh_draws=6519149 gap=24
+[ENABLE] epoch=0 frames=1..2752      calls=2744  nonzero=0  vals: 0:2744     <- frontend
+[ENABLE] epoch=1 frames=2752..8068   calls=8775  nonzero=0  vals: 0:8775     <- stage 1
+[ENABLE] epoch=2 frames=8068..14922  calls=11852 nonzero=0  vals: 0:11852    <- stage 2
+[ENABLE] epoch=3 frames=14922..17421 calls=4999  nonzero=0  vals: 0:4999     <- stage 3
+[ENABLE] TOTAL calls=28370 nonzero=0
+```
+
+**One observed value in every stage: `0`.** The three epochs were cross-checked against the
+game's own `[RT F]` race-state transitions — a signal the detector does not use — and each opens
+within 1-5 frames of one, with exactly three such transitions in 10,977 lines.
+
+Gate: ring `gfx_0.0.0` timeout delta **0**, 0 windows on the display, 0 panics, the play binary
+md5 read twice and never opened for write.
+
+Confirmed independently in the decomp: `Graphics_EnableFog()`'s entire body is the caps-gated
+half and contains **no state 28 at all** — two paths, one gate, and the ungated one is closed by
+the track data.
+
+Also checked as flagged (not a claimed bug): the two stage-lighting pointers **are swapped**
+between `Race.cpp:790` and `Race.cpp:4485-4486`. It does not affect this result — the four-zero
+test is on all four slots together — but it matters to anyone reasoning about which preset is
+primary. The order-independent colour average is not the part at risk.
+
+**Fog is off the suspect list, with evidence.** The caps fix stays (it is why 35/140/36/37
+arrive) and the range work stays dormant but correct. The next state is `D3DRS_AMBIENT` (139) —
+mapped, stored, read by nothing.
+
+Published: `frames/20261014-e020-enable-census/`. Spec: `docs/FOG-VERIFIED-SPEC.md` §1.1.
+
+
 ## RIGHT NOW — CORRECTED
 
 **The Deck daemon is NOT running.** It stopped after finishing

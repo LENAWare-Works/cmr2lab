@@ -63,8 +63,11 @@ game process, no GPU).
 > - **[`docs/FOG-VERIFIED-SPEC.md`](docs/FOG-VERIFIED-SPEC.md)** — fog has **two paths**. The
 >   port's capability bit gated fog's *range and mode*; that is fixed and measured. The
 >   *enable* is a separate path that comes from the track's own data and measures **zero**
->   — the stages do not ask for fog, rather than the port refusing it.
->   Implementing it in the renderer before that capability bit is fixed is dead code.
+>   — the stages do not ask for fog, rather than the port refusing it. That second half is
+>   now **measured across stages**: keyless attract route, 420 s, three stages, 25,626 in-stage
+>   calls, one observed value, `0`. **Fog is a dead feature on these tracks** — off the suspect
+>   list, with the run published in `frames/20261014-e020-enable-census/`. The range work stays
+>   in the tree, correct and dormant.
 >
 > The measurement reports behind those two rounds (r7, r8) are written on the Deck but are
 > **not yet published to this repository**; the findings above are. The search continues in

@@ -53,6 +53,27 @@ the stage's own setting records. Note the call at Race.cpp:760 passes them in th
 `pPrimary = g_unk0x00538234`. **The two pointers are swapped between those two sites** —
 worth one line of checking before anyone reasons about "which preset is primary".
 
+**Checked, 2026-10-14, as one line of checking and not as a claimed bug.** The swap is real:
+
+    Race.cpp:790    StageObject_SetLighting(g_unk0x00538238 /* -> pPrimary   */,
+                                            g_unk0x00538234 /* -> pSecondary */);
+    Race.cpp:4485   pPrimary   = g_unk0x00538234;
+    Race.cpp:4486   pSecondary = g_unk0x00538238;
+
+So within one `StageObject_SetLighting` call the two records are opposite to the ones
+`Race.cpp`'s own `pPrimary`/`pSecondary` name, and therefore `g_stageLighting[0x25]/[0x26]`
+(filled from arg 1) and `[0x52]/[0x53]` (filled from arg 2) — the pair that feeds this
+enable and `Track_SetFogAndSkyAlpha` — come from the opposite record to the one that code
+calls "primary".
+
+**It does not change §1.1's result.** The four-zero test is a condition on all four slots
+*together*, so swapping which record feeds which pair cannot turn an all-zero into a
+non-zero or back; the enable reads 0 either way. It matters to anyone reasoning about *which*
+preset is primary — e.g. which record a fog range would come from on a stage that has one,
+or the sun-direction work that reads `pPrimary->dir` at StageObjects.cpp:5113. The colour
+average at Race.cpp:4488 is `(pSecondary[0x48+i] + pPrimary[0x48+i]) / 2`, which is
+order-independent and so is **not** at risk. Not changed; flagged.
+
 **What the Deck measured:** state 28 set **24,369 times, `uniq=1`, every value 0**, across a
 full race stage. That is not the port blocking fog. That is the enable path running correctly
 while the *stage data* says "no fog." A caps fix could not have changed that, and did not.
@@ -95,14 +116,72 @@ and it is fixed.
 ### Order of work, corrected
 
 1. **Done, keep it:** `GetCaps` reports both bits. Confirmed by census (35 and 140 arrive).
-2. **NOW — and it is cheap:** does state 28 ever go non-zero, in *any* stage? Instrument the
-   enable value per frame and run more than one stage (the attract route walks
-   Kenya -> Sweden -> Greece by itself in ~5 minutes, no keys). If state 28 is 0 in every
-   stage, fog is a dead feature in retail CMR2 and leaves the suspect list with evidence.
+2. **DONE, 2026-10-14 evening — and the answer is ZERO in every stage.** See §1.1 below.
+   State 28 is 0 in all three stages the attract route walks. **Fog is a dead feature in
+   retail CMR2 on these tracks, and it leaves the suspect list with evidence.**
 3. **Only if some stage enables it:** check whether `field_0x14`/`field_0x18` are non-zero in
    the port's own loaded setting record. Non-zero there while slot 0x25 stays 0 means the port
    is dropping them — *that* would be a port bug, and a different one from the caps.
 4. **Then** the shader work. The term is already written and measured working when forced.
+
+### 1.1 THE ENABLE ACROSS STAGES — MEASURED. THE ANSWER IS ZERO EVERYWHERE.
+
+The measurement step 2 asked for was made on 2026-10-14, 20:34-20:41 EEST, on the Deck.
+
+**Method, exactly as it was specified:** the value passed at the live state-28 site was
+instrumented and the **attract route was run with no keys** — no `inject-key.py`, no pad
+synthesis, no forced fog, no `A7VK_FOGFORCE`, no new recipe. The only difference from a plain
+play run was `DECK_ENABLE_CENSUS=1`. 420 s, one binary, ring `gfx_0.0.0` timeout delta **0**,
+0 windows on the display, 0 panics, the play binary read for its md5 twice and never opened
+for write.
+
+```
+[ENABLE] frames=17422 stages=3 mesh_draws=6519149 gap=24
+[ENABLE] epoch=0 frames=1..2752      calls=2744  nonzero=0  vals: 0:2744     <- frontend
+[ENABLE] epoch=1 frames=2752..8068   calls=8775  nonzero=0  vals: 0:8775     <- stage 1
+[ENABLE] epoch=2 frames=8068..14922  calls=11852 nonzero=0  vals: 0:11852    <- stage 2
+[ENABLE] epoch=3 frames=14922..17421 calls=4999  nonzero=0  vals: 0:4999     <- stage 3
+[ENABLE] TOTAL calls=28370 nonzero=0
+[ENABLE] IN-STAGE (epoch>=1) stages=3 calls=25626 nonzero=0
+```
+
+**The strong form of the result is the value histogram: exactly ONE value was observed in
+every stage, and it is `0`.** Not "zero on average" — there is no second value to find. 25,626
+of the calls are inside a race stage; the 2,744 in epoch 0 are the frontend and are reported
+separately rather than allowed to pad the claim.
+
+**The stage detector was checked against a signal it does not use.** The epochs come from the
+RHI's view of a stage (a run of frames drawing mesh geometry, `FVF 0x2d2`, separated by ≥24
+frames with none). The game's own per-frame `[RT F]` race log — `RallyDataState()`, entirely
+independent — shows exactly three race transitions in 10,977 lines, and each epoch opens
+within 1-5 frames of one:
+
+| epoch | opens at frame | game's own transition | delta |
+|---|---|---|---|
+| 1 | 2752 | `state 8` at frame 2757 | 5 |
+| 2 | 8068 | `state 8` at frame 8070 | 2 |
+| 3 | 14922 | `state 8` at frame 14923 | 1 |
+
+The route is documented as Kenya -> Sweden -> Greece. Three stages, three matches.
+
+**Prediction, pre-registered before the run, and it held:** state 28 is 0 everywhere, because
+CMR2 shipped fog as a driver-capability feature and these tracks are clear weather. The
+prediction and its falsifier are published with the run, not written afterwards.
+
+**What this closes:** fog is off the suspect list. The caps fix stays and is not wasted — it
+is why 35/140/36/37 arrive — and the range work stays in the tree, correct and dormant, for
+the day a stage that wants it turns up.
+
+**What it does not close:** the *reason* the four lighting slots are zero. Step 3 below
+(are `field_0x14`/`field_0x18` non-zero in the port's own loaded setting record?) is a
+different question from "does any stage enable fog", and this run does not answer it — it
+answers only that no stage's *enable* ever went non-zero. If the port were silently dropping
+those two fields, the observable would be identical from here.
+
+Published: `frames/20261014-e020-enable-census/` — report, prediction, patch, census, run
+header, transition cross-check, MANIFEST.
+
+---
 
 ## 2. STATE 28 IS THE ENABLE — AND THE DECOMP WRITES IT AS RAW HEX
 
@@ -114,12 +193,19 @@ sites. **Grep for `0x1c`.**
 
 | where | value |
 |---|---|
-| `Graphics.cpp:1895` `ConfigureDefaultRenderStates` | `0x1c, 0` — fog OFF at device init |
-| `Game.cpp:2662` | `0x1c, Graphics_GetFlareStateValue()` — the live per-frame enable |
-| `Game.cpp:2688` | `0x1c, 0` — off for the 2D/billboard pass |
-| `Game.cpp:2708` | `0x1c, 0` — off for the 2D layer pass |
+| `Graphics.cpp:2056` `ConfigureDefaultRenderStates` | `0x1c, 0` — fog OFF at device init |
+| `Game.cpp:2709` | `0x1c, Graphics_GetFlareStateValue()` — the live per-frame enable |
+| `Game.cpp:2735` | `0x1c, 0` — off for the 2D/billboard pass |
+| `Game.cpp:2755` | `0x1c, 0` — off for the 2D layer pass |
 
 Fog is toggled **several times per frame**. Per-draw state, not a global.
+
+**On the line numbers.** The numbers above are what is in the tree **as it stands**; the
+earlier revision of this file cited `Graphics.cpp:1895` and `Game.cpp:2662/2688/2708`, which
+were **correct when written**. `Game.cpp` and `Graphics.cpp` have been edited since (the
+working tree is live), so the citations moved under them. Both sets name the same four
+statements — `Graphics_EnableFog`'s body sets fog *mode*, never state 28, so §1's split is
+unaffected. Grep `0x1c`, as above, rather than trusting either set of numbers.
 
 ---
 
@@ -257,6 +343,8 @@ colour = mix(FOGCOLOR, lit_colour, f)
   `uniq=1`, one stage.** If it is 0 in every stage, fog is a dead feature in retail CMR2 and
   leaves the suspect list with evidence rather than with an assumption. If some stage enables
   it, that stage is the only one where the range work matters.
+  **ANSWERED 2026-10-14 (see §1.1): it is 0 in EVERY stage — 3 stages, 25,626 in-stage calls,
+  one observed value, `0`. Fog is a dead feature in retail CMR2 on these tracks.**
 - **Kenya** — far terrain should stop matching near terrain; the one-warm-hue-family
   measurement should break up.
 - **Sweden** — sharpest detector. Snow albedo 0.85-1.0 lands on 255 with no fog. Expect a

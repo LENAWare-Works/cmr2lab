@@ -72,8 +72,11 @@ rather than guessed at, and both are written up in `docs/`:
   `Graphics_EnableFog()`'s capability check; the port reported the bit as zero, so they were
   never sent. That is fixed and measured — 35/140 now arrive. The **enable** (state 28) is a
   different path with no caps call in it at all: it is driven by the track's own lighting
-  slots `0x25/0x26/0x52/0x53`, and the game measures **0 in 24,369 calls, `uniq=1`**. Fog is
-  off because the stage data does not ask for it, not because the port blocked it.
+  slots `0x25/0x26/0x52/0x53`. That was measured in ONE stage (0 in 24,369 calls, `uniq=1`)
+  and has now been measured **across stages: keyless attract route, 420 s, three stages,
+  25,626 in-stage calls, exactly one value observed — `0`**. Fog is off because the stage data
+  does not ask for it, not because the port blocked it. **This is now a negative with a run
+  behind it**: `frames/20261014-e020-enable-census/`. Ring delta 0, 0 windows, 0 panics.
 
 Separately and smaller: the setup-screen car renders collapsed.
 
@@ -91,8 +94,10 @@ Separately and smaller: the setup-screen car renders collapsed.
 `docs/WHERE-THIS-IS-GOING.md` is the roadmap. The immediate next item is the ambient
 test, whose prediction is on record so it can be wrong.
 See `docs/AMBIENT-CONTRADICTION-RESOLVED.md` for the prediction and
-`docs/FOG-VERIFIED-SPEC.md` for the two fog paths — the capability-bit fix has landed and is
-measured; what is open now is whether any stage enables fog at all.
+`docs/FOG-VERIFIED-SPEC.md` for the two fog paths. **Both are now answered:** the
+capability-bit fix has landed and is measured, and the enable was measured across three stages
+and is **zero everywhere** — so fog is off the suspect list and `D3DRS_AMBIENT` (139) is the
+next state, mapped, stored, and read by nothing.
 
 ## If you just want to play the original
 

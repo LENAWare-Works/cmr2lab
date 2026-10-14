@@ -21,9 +21,10 @@ Start with these:
 
 - [Scene ambient](AMBIENT-CONTRADICTION-RESOLVED.md) — why the lighting term measured as a
   1.0000 no-op, and why that measurement *is* the bug
-- [Fog](FOG-VERIFIED-SPEC.md) — two paths: the port's capability bit gated fog's range and
-  mode (fixed and measured); the enable comes from track data and measures zero, so the stage
-  simply does not ask for fog
+- [Fog](FOG-VERIFIED-SPEC.md) — **settled.** Two paths: the port's capability bit gated fog's
+  range and mode (fixed and measured); the enable comes from track data and was then measured
+  across stages — **zero in all three**, one observed value, `0`. The stages do not ask for
+  fog. Off the suspect list, with the run published in `frames/20261014-e020-enable-census/`.
 
 ## Engineering evidence
 

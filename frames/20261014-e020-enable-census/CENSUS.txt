@@ -1,0 +1,10 @@
+[ENABLE] census ON (DECK_ENABLE_CENSUS=1) -- state 28 (FOGENABLE), per stage
+[ENABLE] === state 28 across stages (atexit) ===
+[ENABLE] frames=17422 stages=3 mesh_draws=6519149 gap=24
+[ENABLE] epoch=0 frames=1..2752 calls=2744 nonzero=0 vals: 0:2744
+[ENABLE] epoch=1 frames=2752..8068 calls=8775 nonzero=0 vals: 0:8775
+[ENABLE] epoch=2 frames=8068..14922 calls=11852 nonzero=0 vals: 0:11852
+[ENABLE] epoch=3 frames=14922..17421 calls=4999 nonzero=0 vals: 0:4999
+[ENABLE] TOTAL calls=28370 nonzero=0
+[ENABLE] IN-STAGE (epoch>=1) stages=3 calls=25626 nonzero=0
+[ENABLE] VERDICT: state 28 is ZERO in EVERY stage measured (3 stage(s)). Fog is a dead feature in retail CMR2 on these tracks.
