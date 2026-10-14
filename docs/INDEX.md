@@ -21,8 +21,9 @@ Start with these:
 
 - [Scene ambient](AMBIENT-CONTRADICTION-RESOLVED.md) — why the lighting term measured as a
   1.0000 no-op, and why that measurement *is* the bug
-- [Fog](FOG-VERIFIED-SPEC.md) — fog is gated by a capability bit the port reports as zero,
-  so the game never sends it; the fix is a capability report, not a renderer feature
+- [Fog](FOG-VERIFIED-SPEC.md) — two paths: the port's capability bit gated fog's range and
+  mode (fixed and measured); the enable comes from track data and measures zero, so the stage
+  simply does not ask for fog
 
 ## Engineering evidence
 
