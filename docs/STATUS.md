@@ -67,10 +67,13 @@ rather than guessed at, and both are written up in `docs/`:
   taken from track data, and D3D7's ambient term is their product. The port keeps the first
   and discards the second, so every lit pixel starts at 1.0 and can only clamp at 255.
   That is precisely the flat white snow.
-- **The fog term.** `docs/FOG-VERIFIED-SPEC.md`. Fog is **not** a dropped state. It is
-  absent from the runtime census because the game never sends it: `Graphics_EnableFog()`
-  sits entirely behind a capability bit that the port reports as zero. Implementing fog in
-  the renderer before that bit is fixed is dead code that will measure as "no change".
+- **The fog term.** `docs/FOG-VERIFIED-SPEC.md`. **Corrected 14 Oct — two separate paths,
+  and only one is caps-gated.** The **range and mode** (35/140/36/37) sit behind
+  `Graphics_EnableFog()`'s capability check; the port reported the bit as zero, so they were
+  never sent. That is fixed and measured — 35/140 now arrive. The **enable** (state 28) is a
+  different path with no caps call in it at all: it is driven by the track's own lighting
+  slots `0x25/0x26/0x52/0x53`, and the game measures **0 in 24,369 calls, `uniq=1`**. Fog is
+  off because the stage data does not ask for it, not because the port blocked it.
 
 Separately and smaller: the setup-screen car renders collapsed.
 
@@ -88,8 +91,8 @@ Separately and smaller: the setup-screen car renders collapsed.
 `docs/WHERE-THIS-IS-GOING.md` is the roadmap. The immediate next item is the ambient
 test, whose prediction is on record so it can be wrong.
 See `docs/AMBIENT-CONTRADICTION-RESOLVED.md` for the prediction and
-`docs/FOG-VERIFIED-SPEC.md` for the capability-bit fix that has to land before fog work
-is worth starting.
+`docs/FOG-VERIFIED-SPEC.md` for the two fog paths — the capability-bit fix has landed and is
+measured; what is open now is whether any stage enables fog at all.
 
 ## If you just want to play the original
 
