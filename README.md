@@ -11,8 +11,15 @@ The actual engine, recompiled for Linux.
 ### The cars below are not screenshots. We rendered them.
 
 The game's own `.c3d` geometry and `.bfl` liveries, decoded and rasterised by a renderer
-written from scratch in this repo (`assets/` — regenerated from scratch, no 3D engine, no
-game process, no GPU).
+written from scratch in this repo: [`tools/render/`](tools/render/) — no 3D engine, no game
+process, no GPU. Point it at your own copy and it regenerates every image on this page:
+
+```sh
+CMR2_CARS=/path/to/game/Game/Cars python3 tools/render/make_assets.py
+```
+
+See [`docs/RENDER.md`](docs/RENDER.md) for the format notes and the two things that are easy
+to get wrong (wheel placement, and the livery-vs-AO texture choice).
 
 | | | | |
 |---|---|---|---|
