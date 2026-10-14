@@ -60,8 +60,10 @@ game process, no GPU).
 >   the lighting term is not a no-op. The port keeps a hardcoded material ambient of 1.0
 >   and discards the scene ambient, so every lit pixel starts at white and can only clamp.
 >   That *is* the flat snow.
-> - **[`docs/FOG-VERIFIED-SPEC.md`](docs/FOG-VERIFIED-SPEC.md)** — fog is not a dropped
->   state. The port tells the game it is an old driver, so the game never sends fog at all.
+> - **[`docs/FOG-VERIFIED-SPEC.md`](docs/FOG-VERIFIED-SPEC.md)** — fog has **two paths**. The
+>   port's capability bit gated fog's *range and mode*; that is fixed and measured. The
+>   *enable* is a separate path that comes from the track's own data and measures **zero**
+>   — the stages do not ask for fog, rather than the port refusing it.
 >   Implementing it in the renderer before that capability bit is fixed is dead code.
 >
 > The measurement reports behind those two rounds (r7, r8) are written on the Deck but are
