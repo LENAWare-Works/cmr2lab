@@ -1,9 +1,116 @@
 # CMR2LRE live progress
 
-**Updated 2026-10-14T15:12:00+03:00 EEST by the phone-side Lena.**
+**Updated 2026-10-15T00:20:00+03:00 EEST by the phone-side Lena.**
 
 This page is a coordination update. It does not pretend that a worker has finished work
 that has not produced a report.
+
+## 2026-10-15 ~00:20 EEST — THE NEAR CLIP IS LIVE, THE AMBIENT IS DEAD, AND THE PLAY PATH CAN NO LONGER BE SILENTLY SWAPPED
+
+Three things landed since the last revision. All three are measured. None of them is a
+claim that the picture is fixed.
+
+### 1. THE NEAR CLIP IS PROMOTED AND LIVE
+
+`PLAY/out-plain/cmr2` is now md5 `1c0bee6ad2e92c23ca8f36289f7b5b77` — the build measured
+at **8.3 % dropped vs 90.8 % control**. The old constant plane (5.86) was deleting
+**90.8 % of every triangle the game submitted**; the promoted build keeps **4.9× more**.
+Ring `gfx_0.0.0` timeout delta **0**. Behind-eye geometry is removed identically in both
+arms — the plane still bites, it just bites in the right place.
+
+This outranks any dropped state on the checklist. Nine tenths of the geometry was being
+thrown away, and **nobody had looked at the race picture since that changed.** The next
+round measures the picture on this build rather than chasing another state.
+
+### 2. THE AMBIENT FIX IS FALSIFIED — WITH THE MECHANISM, NOT JUST THE VERDICT
+
+`work/AMB-AB-20261015/`. Two GPU runs, ~7.7 minutes. One question per run. Ring delta 0.
+
+The predicted fix was: read `rs[A7RS_AMBIENT]` instead of the hardcoded white material
+ambient, and the snow would darken and get its edges back. It does not. It **deletes the
+picture**, and the run's own numbers say why:
+
+```
+ARM DRAW TALLY: amb_fills=2899240  rs139==0: 2781948 (95.95%)  rs139!=0: 117292 (4.05%)
+```
+
+**95.95 % of the 2.9 million draws the arm touched read `rs139 = 0x00000000`.** The arm
+multiplies the lighting term by zero on almost every draw. `zero%` goes **0.005 % → 65.2 %**
+across the run and **0.006 % → 88.64 %** on the snow stage. A frame that is 88.6 % exactly
+black has no edges by construction — so `road_edge 0.861 → 0.758` is not a reading of the
+fix, it is a reading of the absence of a picture.
+
+The 2026-10-12 GRFX-AB negative **reproduces on today's binary to three digits**:
+
+| snow metric | GRFX-AB 10-12 (`a68bb585…`) | AMB-AB 10-15 (`1813b0a3…`) |
+|---|---|---|
+| frame mean ratio | 0.137 | **0.137** |
+| zero % (AMB arm) | 88.7 | **88.64** |
+| road_edge ratio | 0.872 | **0.880** |
+| road_sd ratio | 2.680 | **2.693** |
+
+Two independent builds, four days apart, same defect, same numbers. That is a reproducible
+measurement, not a one-off. **The straight-substitution ambient fix is dead.**
+
+### 3. FOG IS CLOSED — ONE OBSERVED VALUE IN EVERY STAGE
+
+`state 28` (`D3DRS_FOGENABLE`) is **0 in every one of the three stages the attract route
+walked** — 25,626 in-stage calls, 28,370 calls in the run, `nonzero=0`. Not "zero on
+average": **one single value observed, `0`, everywhere.** Fog does not exist in retail
+CMR2 on these tracks. The caps fix stays and is not wasted (it is why 35/140/36/37 arrive
+at all), but it could never have turned fog on — the enable is a different, ungated path,
+and that path says no.
+
+### 4. THE PLAY PATH IS REGISTRY-GATED — THIS WAS A REAL FAILURE, AND IT IS FIXED
+
+On 2026-10-14 at 22:35:49 a round script copied an **intermediate** build onto the play
+path while Miami was playing. That build carried a first-revision near-clip patch with a
+units bug, so it behaved exactly as if it had no patch at all. The build it replaced was
+better. He found out by launching the game and finding it broken.
+
+The root cause was not the patch. It was that **nothing in the project had a concept of
+"which build is current"** — 21 separate round scripts each had their own copy step onto
+that path, and the only gate asked *"can a car drive."* The bad build could drive. It just
+rendered wrong.
+
+What exists now:
+
+- `PLAY/REGISTRY.json` names the one md5 that is playable.
+- `~/lena/bin/lre` is the **only** thing allowed to write the path. It refuses a candidate
+  that cannot drive, keeps the previous build in `gold/`, and writes the registry.
+- `cmr2lre.sh` checks the path against the registry **before it starts anything** and
+  restores the registered build from `gold/` if they disagree.
+- `lre-watchdog.timer` repeats that check **every 5 minutes**, so a clobber is caught while
+  he is away from the machine rather than at his next launch.
+
+**Verified by deliberately corrupting the file and watching it self-heal**, twice — once
+via the launcher, once via the watchdog. `ROUND-DISCIPLINE.md` carries the rule and the
+reason.
+
+### 5. THE FRONTEND 3D PATH IS WORKING
+
+Miami's own report, 2026-10-14: the **206 renders fine**, and the pre-race **SETUP** and
+**REPAIR** car screens both work. All three need the mesh, the transform **and** the
+textures to land together — so this is the whole menu-car rendering path, not one screen.
+
+### CORRECTION TO THE PREVIOUS REVISION
+
+That revision stated the Deck daemon was **NOT running** and had picked up nothing for
+~2h30m. That was true when written at 15:12 and is **false now** — the daemon is active
+and has been working rounds all evening. Corrected here rather than quietly overwritten.
+
+### WHAT IS STILL NOT TRUE
+
+- **The road still does not separate from the terrain.** That is the defect, unchanged.
+- No picture claim is made about the promoted near-clip build. The measurement is running.
+- The white band now has one exclusion: the near clip is **not** its cause (present and
+  identical at the same place with the clipper off, bands within 0.4 pp between arms).
+
+**Honesty line:** this section publishes two falsifications, one promotion and one
+infrastructure fix. It does not claim the port is finished, and it does not claim the race
+picture looks right — only that the geometry is no longer being thrown away and the build
+he launches cannot be silently replaced by a worse one.
+
 
 ---
 

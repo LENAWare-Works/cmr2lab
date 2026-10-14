@@ -10,6 +10,9 @@ working game with one big known visual defect.
 ## What works today
 
 - Launch it. A window opens, the frontend loads, the menu car renders.
+- **The menu car renders properly, including the pre-race SETUP and REPAIR screens.**
+  Those three need the mesh, the transform *and* the textures to land together — confirmed
+  working on 14 October.
 - A full stage loads and runs — car physics, terrain, a real race, **start to finish**.
 - **The recipe:** launch, then **do not touch anything for ~30 seconds.** The attract
   demo walks itself into a race. *Pressing a key parks it on the frontend — that is not a
@@ -78,7 +81,7 @@ rather than guessed at, and both are written up in `docs/`:
   does not ask for it, not because the port blocked it. **This is now a negative with a run
   behind it**: `frames/20261014-e020-enable-census/`. Ring delta 0, 0 windows, 0 panics.
 
-Separately and smaller: the setup-screen car renders collapsed.
+*(The setup-screen car used to render collapsed. As of 14 October it renders correctly.)*
 
 ## Under the hood
 
@@ -91,13 +94,34 @@ Separately and smaller: the setup-screen car renders collapsed.
 
 ## Where this is going
 
-`docs/WHERE-THIS-IS-GOING.md` is the roadmap. The immediate next item is the ambient
-test, whose prediction is on record so it can be wrong.
-See `docs/AMBIENT-CONTRADICTION-RESOLVED.md` for the prediction and
-`docs/FOG-VERIFIED-SPEC.md` for the two fog paths. **Both are now answered:** the
-capability-bit fix has landed and is measured, and the enable was measured across three stages
-and is **zero everywhere** — so fog is off the suspect list and `D3DRS_AMBIENT` (139) is the
-next state, mapped, stored, and read by nothing.
+`docs/WHERE-THIS-IS-GOING.md` is the roadmap.
+
+**Both of the two states this page was waiting on are now answered, by measurement:**
+
+- **Fog is closed.** The enable was measured across three stages on the keyless attract
+  route — 25,626 in-stage calls, exactly one value observed: `0`. Fog does not exist in
+  retail CMR2 on these tracks. `frames/20261014-e020-enable-census/`.
+- **The ambient fix is falsified, with the mechanism.** `rs139 == 0x00000000` on
+  **95.95 %** of 2.9 million draws, so substituting it multiplies the lighting term by
+  zero — `zero%` 0.006 % → **88.64 %** on snow. A frame that is 88.6 % black has no edges
+  by construction. The 2026-10-12 negative reproduced to three digits on a different build
+  four days later. **The straight-substitution fix is dead.**
+
+**The next item is not another state.** It is a measurement of the picture on the promoted
+near-clip build, because the picture has not been looked at since 90.8 % of the geometry
+stopped being thrown away.
+
+## The play path is now gated
+
+On 2026-10-14 an intermediate build was copied over `PLAY/out-plain/cmr2` while Miami was
+playing — a near-clip patch that behaved as if it were not there. The root cause was not the
+patch: it was that **21 round scripts each had their own copy step onto that path, and the
+only gate asked "can a car drive"** — which the bad build could.
+
+Now `PLAY/REGISTRY.json` names the playable md5, `~/lena/bin/lre` is the only thing allowed
+to write the path, `cmr2lre.sh` restores the registered build before starting anything, and a
+watchdog re-checks every 5 minutes. Verified by deliberately corrupting the file and watching
+it self-heal.
 
 ## If you just want to play the original
 
