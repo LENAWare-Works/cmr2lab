@@ -49,12 +49,28 @@ thing in this repo:
 
 - The obvious cause was tested. The port drops the game's per-vertex colours, so we
   forced them through. Result: it multiplies the terrain by ~0.55 and stays **nearly
-  flat** — not enough to separate road from verge. `docs/ROAD-r7-REPORT.md`. **That is
-  not the fix, and we measured it rather than assuming it.**
-- The lighting term was tested next and came back a **1.0000 no-op** —
-  `docs/ROAD-r8-REPORT.md`.
-- Remaining candidates: the scene ambient (`D3DRS_AMBIENT`, set 534,078 times in one race
-  and **read by no code**), and the fog term.
+  flat** — not enough to separate road from verge. **That is not the fix, and we measured
+  it rather than assuming it.** *(Measured in round r7. That report is written on the
+  Deck but is not yet published to this repository — see the note below.)*
+- The lighting term was tested next and came back a **1.0000 no-op**. *(Round r8. That
+  report is likewise not yet published here. The 1.0000 is now understood to be the
+  symptom rather than the verdict — see below.)*
+
+### Both candidates, now characterised — 14 October 2026
+
+Neither is an open mystery any more. Both were read out of the game's own decompiled source
+rather than guessed at, and both are written up in `docs/`:
+
+- **The scene ambient.** `docs/AMBIENT-CONTRADICTION-RESOLVED.md`. The 1.0000 above is not
+  evidence that the lighting term does nothing — it *is* the bug.
+  `Scene_RestoreLights` sets a **material** ambient of (1,1,1) and a **scene** ambient
+  taken from track data, and D3D7's ambient term is their product. The port keeps the first
+  and discards the second, so every lit pixel starts at 1.0 and can only clamp at 255.
+  That is precisely the flat white snow.
+- **The fog term.** `docs/FOG-VERIFIED-SPEC.md`. Fog is **not** a dropped state. It is
+  absent from the runtime census because the game never sends it: `Graphics_EnableFog()`
+  sits entirely behind a capability bit that the port reports as zero. Implementing fog in
+  the renderer before that bit is fixed is dead code that will measure as "no change".
 
 Separately and smaller: the setup-screen car renders collapsed.
 
@@ -71,6 +87,9 @@ Separately and smaller: the setup-screen car renders collapsed.
 
 `docs/WHERE-THIS-IS-GOING.md` is the roadmap. The immediate next item is the ambient
 test, whose prediction is on record so it can be wrong.
+See `docs/AMBIENT-CONTRADICTION-RESOLVED.md` for the prediction and
+`docs/FOG-VERIFIED-SPEC.md` for the capability-bit fix that has to land before fog work
+is worth starting.
 
 ## If you just want to play the original
 
