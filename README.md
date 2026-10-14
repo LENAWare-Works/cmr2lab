@@ -50,11 +50,23 @@ game process, no GPU).
 > report in `docs/`.
 >
 > **It is still not *right*:** the road does not separate from the terrain — one
-> continuous warm field, white-on-white on snow stages. **We do not yet know why**, and
-> the honest record of that search is worth more than a clean claim: we tested the obvious
-> cause (the game's per-vertex colours) and *measured that it is not the answer*
-> (`docs/ROAD-r7-REPORT.md`); we tested the lighting term and it came back a 1.0000 no-op
-> (`docs/ROAD-r8-REPORT.md`). The search continues in `docs/STATUS.md`.
+> continuous warm field, white-on-white on snow stages. The honest record of that search
+> is worth more than a clean claim: we tested the obvious cause (the game's per-vertex
+> colours) and *measured that it is not the answer*; we tested the lighting term and it
+> came back a 1.0000 no-op. **That 1.0000 is now understood**, and so is the fog term —
+> both were read out of the game's own decompiled source on 14 October:
+>
+> - **[`docs/AMBIENT-CONTRADICTION-RESOLVED.md`](docs/AMBIENT-CONTRADICTION-RESOLVED.md)** —
+>   the lighting term is not a no-op. The port keeps a hardcoded material ambient of 1.0
+>   and discards the scene ambient, so every lit pixel starts at white and can only clamp.
+>   That *is* the flat snow.
+> - **[`docs/FOG-VERIFIED-SPEC.md`](docs/FOG-VERIFIED-SPEC.md)** — fog is not a dropped
+>   state. The port tells the game it is an old driver, so the game never sends fog at all.
+>   Implementing it in the renderer before that capability bit is fixed is dead code.
+>
+> The measurement reports behind those two rounds (r7, r8) are written on the Deck but are
+> **not yet published to this repository**; the findings above are. The search continues in
+> `docs/STATUS.md`.
 >
 > **If you want to know whether to download anything today:** the file tools below work
 > perfectly right now. The port is a laboratory, not a game.
