@@ -92,3 +92,80 @@ verify the current one; please correct it.
 **Honesty line:** this update corrects a false coordination claim and publishes two
 phone-side findings. It does not claim the native port is finished, and it does not claim
 anything about the current play binary beyond the last verified hash.
+
+---
+
+# FOG-IS-THE-FIRST-STATE-20261014 — deck-side report
+
+**Added 2026-10-14T17:55+03:00 EEST by the Deck daemon (Lena).** Appended; nothing above
+this line was altered.
+
+## 1. RIGHT NOW
+
+The fog state set is mapped, the vertex-fog term is implemented, and it is **measured
+working, from one binary, both arms alternating per frame**. What is NOT true is the
+brief's premise that fog causes the white-on-white: the game never turns fog on. Fog leaves
+the suspect list with evidence. The next state is **D3DRS_AMBIENT (139)**.
+
+## 2. DONE (evidence)
+
+**Which fog mode the game actually sets** -- asked for explicitly, answered by measurement
+rather than by reading:
+* `FOGVERTEXMODE (140)` = **3 = D3DFOG_LINEAR**, live, `uniq=2`, 17952 calls.
+* `FOGTABLEMODE (35)` = **0 = D3DFOG_NONE**, 17952 calls.
+So the live mode is **vertex fog, linear**. That is the one implemented. Both states are
+mapped and STORED now (they were dropped); 34/36/37 (FOGCOLOR/FOGSTART/FOGEND) are mapped
+and stored too, and 36/37 now ARRIVE where the round-1 census measured them ABSENT -- that
+is the `dwMiscCaps |= 0x80` device-cap bit working, since `Graphics_GetDeviceCaps90()` gates
+every range the game sends.
+
+**Which quantity feeds fog** -- the brief asked this be stated: the **W component of the
+clip-space position before the perspective divide** (camera-space distance), carried to the
+fragment stage as the `vFogDepth` varying. Not the post-divide depth-buffer value.
+
+**Predicted vs measured, forced run (fogC, `A7VK_FOGFORCE=30,900,ffffff`, 50 pairs):**
+
+    metric      fog ON     fog OFF      delta
+    share      0.55709     0.51888    +0.03821
+    far      119.86660   103.85158   +16.01502
+    mean     109.30377    97.57134   +11.73243
+    (far higher in 48/50 pairs)
+
+The prediction's SIGN is wrong and that is stated rather than buried: the brief predicted
+the dominant-octile share would FALL; it ROSE. That is what a WHITE fog colour does to a
+mid-brightness scene -- it pushes pixels toward the top octile. The mechanism the brief
+actually specified, **a distance gradient in the ground band**, is present and measured:
+vertical luma gradient (bottom-third minus top-third) is **-29.23 with fog on vs -21.01 with
+it off, 39 % steeper**, concentrated in rows 200-350 (the horizon band) at +22 to +29 luma
+and falling to +3-6 in the extreme foreground.
+
+**Measured, unforced run (fogD, the game's own values): cross-arm signed mean delta -1.07
+luma vs +11.74 forced -- an 18x difference.** `D3DRS_FOGENABLE` is **0 in every one of
+24369 calls, uniq=1**, across a full race. The game does not fog.
+
+**Gate:** ring `gfx_0.0.0` timeout delta **0** on both runs. 0 windows on his desktop.
+0 panics. 8953 and 7977 race frames at `state=8`.
+
+**Published:** `LENAWare-Works/cmr2lab` commit `476bcf5`, dir
+`frames/20261014-1750-fog-first-state/` -- both arms, arm-labelled, md5s in
+`MANIFEST.txt`.
+
+**Where I failed, and it was my own instrument:** run `fogB` (first attempt this round)
+produced 100 cross-arm pairs that were a NULL BY CONSTRUCTION -- `A7VK_FOGFORCE` set the
+range and colour but the enable stayed the game's 0, and an unconditional FOGCOLOR read
+overwrote the forced white with the game's unset black. The fog term never executed in
+either arm. Both bugs are fixed in `run/fog-ab-run3`. It was caught by checking the arm
+label against what the code was actually gated on -- the same instrument that caught the
+round-1 parity bug.
+
+## 3. IN PROGRESS (honest fraction)
+
+Fog: **complete** -- 6/6 states mapped, term implemented, forced and unforced both measured,
+published. The whole task is **not** complete: the checklist continues, and the one thing
+the brief wanted most (a fix to the white-on-white) has NOT been delivered by fog, because
+the game does not use it. Item 2 of the order, `D3DRS_AMBIENT` (534,078 calls, mapped,
+stored, read by nothing -- `grep A7RS_AMBIENT a7_vk32.c` = 0), is the next state and is
+untouched.
+
+**Honesty line:** this section claims the fog TERM works and the game does not enable fog.
+It does not claim fog improved the shipped picture, because it cannot and does not.
