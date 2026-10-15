@@ -32,6 +32,14 @@ Each entry is a trap: a word that suggests a system which is not there.
 | **any shadow render state** | **none.** There is no `D3DRS_*SHADOW` or `D3DTSS_*SHADOW` anywhere. | Confirms the above: shadows cannot be a lighting effect because nothing in the device state describes one. |
 | **one shadow system** | **There are THREE, and the word alone does not tell you which.** This is the single biggest source of wasted searching here. | **① frontend menu text** (drop shadows behind UI text, `FrontendMenus.cpp`, palette `g_colourShadowWhite` / `…Text` / `…Dim`) · **② the car's own shadow** (`CarPhysics.cpp` `SHADOW_OCTAGON`/`SHADOW_CORE` macros, octagon + core, `Quad2D_QueueFixedTriangle(…, NULL, (Quad2D *)10)` — texture **NULL by design**, colour lives in the vertex) · **③ scene shadow geometry** on terrain and foliage (`Scene_AddShadowCaster` → `Scene_EmitNodeShadowGeometry` → batched `Scene_BeginShadowBatch`/`Scene_EndShadowBatch`). |
 | **that `g_colourShadowWhite` is the white terrain patches** | **It is not.** That variable is **frontend menu text**. | A confident wrong answer I nearly published. The race-time flat-shadow combiner is texture-stage **mode 10** (`Graphics.cpp` `case 10:`): `COLORARG1 = D3DTA_TEXTURE \| D3DTA_ALPHAREPLICATE`, `COLORARG2 = D3DTA_DIFFUSE`, `COLOROP = MODULATE` — **the texture is used as an alpha mask**, modulated by the vertex colour. |
+| **that the white shadow is white because its texture's alpha is wrong** | **No — the alpha half of the equation is a pass-through.** `t0.aaaa` measures **255 everywhere** on the GPU. The white comes from the *other* operand. | The mode-10 combiner is `c.rgb = argval(33) * argval(2)` = `t0.aaaa * vDiffuse` (`a7vk3d.frag`). `t0.aaaa` = 255, so the result *is* `vDiffuse`. And the port supplies `b.matDiffuse`, not the game's vertex colour — see the row below. |
+| **that the vertex colour reaches the shadow combiner** | **It does not, in any shipped mode.** `a7vk3d.vert`: `base = (flags.w > 0.5) ? inDiffuse : b.matDiffuse`, and `a7_vk32.c` sets `b->flags[3] = 0` in every shipped mode. Measured: **`b.matDiffuse` = (1.000 1.000 1.000 1.000) — pure white.** | **This is the whole white-shadow mechanism**: the port feeds a white material where D3D7 would have supplied the vertex colour the game already stamped. The fix is **one `flags.w` away** — the `vcol` arm already exists and is env-gated. |
+| **that removing the shadow draws *fixes* the white shadow** | **It makes the shadow GO, not go DARK.** Refusing the draw at the device removes the white patch and leaves the reason it was white completely untouched. | Measured 2026-10-15: the game still emits, batches and submits the shadow mesh; the port merely declines to record it. **The game does not know.** A kill switch is a floor, not a fix — and the cost of producing the shadow is still paid. |
+| **that the shadow *decal* and the thing *casting* it are one draw** | **They are two.** An arm that removes decals (stage-0 combiner = MODULATE + `TEXTURE\|ALPHAREPLICATE`, `ConfigureTextureStageBlendMode` `case 10:`) leaves every caster — the trees and cars themselves — drawing normally. | Which is why a no-decal run is an *inconclusive* result if the white patches turn out to be casters. The negative is real and must be reported as a negative. |
+| **that a white patch on the track is a shadow** | **Measured twice: it was DUST.** The specimen believed to be the shadow was the wheel-spray particle. | `SHADOW-MECHANISM-FOUND-20261015` says it outright — *"this pair does not have one; the specimen was dust."* **Identify the specimen before debugging it.** Two arms compared a matched patch at **35 px vs 37 px** of a million: identical, and it was brown dirt in both. |
+| **that the shadow mesh is only mis-coloured** | **It also has a real geometry defect, measured on the bytes the GPU reads.** 87,565 shadow triangles tested against their own mvp: **21.01 % degenerate** (`\|area\| < 1e-7`), **36.59 % wound flipped** relative to their own draw's majority, **27.60 % with a vertex at `w <= 0`**, 0.24 % larger than the whole viewport, and **72 of 400 draws project to an NDC span wider than 100**. | `SHADOW-CENSUS-BLIND-20261015`. This is the "clipped flickering triangles" he describes — and it is *not* a colour problem, so a colour fix will not clear it. |
+| **that the shadow's zone lookup works and the count is small** | **The counter saturates at exactly 1236 — it is a CAP, not a measurement.** Real count is `>= 1236`. `noZone` runs min **460**, p50 **852**, p90/max **1236**. Even the *simplest* draw in the run (`parts=11`) already has **460** parts with no zone. `behindNear` median **26 %**, p90 61 %, max 72 %. | `SHADOW-MECHANISM-FOUND-20261015`. Next thread named there: `Scene_MarkShadowPartDirty` (`SceneNode.cpp`) and the sector-lighting path that consumes it (`SceneNode.cpp`). |
+| **that the ambient fix will clear the white end** | **NO — measured negative, 2026-10-15.** Folding state 139 into `matAmbient` via `a7vk_fill_block` **does not move the picture**: per-frame alternating A/B, 27 matched opposite-arm pairs, `road_edge` **1.000 -> 1.000**, sky exactly-255 count **55 -> 55**. | State 139 is `0x00000000` on **95.95 %** of draws. The guarded arm is byte-identical by construction on ~96 % of geometry; unguarded deletes the picture (88.6 % black snow). **Both forms fail, for opposite reasons.** Do not re-open 139 as a lighting fix. |
 | **fog in the game** | **the game never turns it on.** `D3DRS_FOGENABLE` is **0 in all 24,369 calls**, uniq=1, across a full race stage. | Fog is a *driver-capability* feature CMR2 shipped behind a flag these tracks do not set. It is a **dead feature in retail**, not a missing port feature. |
 | **a lens flare** | **"FLARE" is a misnomer in the decomp.** | `StageObject_SetForwardedFlareState` → `Graphics_SetFlareStateValue` → `SetRenderState(0x1c, …)`. State `0x1c` is **`D3DRS_FOGENABLE`**. `g_stageLighting[0x25]/[0x26]/[0x52]/[0x53]` drive it. Not a flare, not fog you can see. |
 | **dynamic lighting to reimplement** | **there is none to write.** | The game does all transform and lighting itself before submitting. `lit` measured at a **1.0000 floor** for 99.82 % of vertices. Rewriting lighting math on the port side is rewriting something the game does not ask the device to do. |
@@ -66,6 +74,10 @@ Each entry is a trap: a word that suggests a system which is not there.
 | "the texture id" | **a SLOT index into `textureBuffer[2048]`, not an image** — and a port `texId` is a *second*, different number assigned at first bind. §6.2 | `CTexture::FindLoadTexture` -> `pTexture->textureId = i`; `DeckDevice7::SetTexture` -> `nextTexId++` |
 | "the texture is wrong" | **split it at §6.1**: stage track textures are **DXT5** and are decompressed by the **blit** (`DeckSurface7::Blt` -> `dl_decode`); frontend and car textures are **TGA** and decode in software. A complaint about one is not a complaint about the other. | `CGraphics::LoadDDSTexture` / `LoadTGATexture` |
 | the shadow decal's texture | **forced to combiner mode 10**, not stored as 10 — `Scene_DrawShadowBatches` writes 10 onto the Texture, binds, then restores. A trace around the call reads 0. §6.4 (iii) | `Scene_DrawShadowBatches` -> `Frontend_SetObjectField118(pTexture, 10)` |
+| "the world geometry" | drawn by **`Graphics_DrawMeshLOD`**, which has **exactly four dispatch paths** — and **ten `DrawIndexedPrimitiveVB` call sites are the entire world submission surface** | `Graphics.cpp` x8, `Game.cpp` x2 |
+| "the shadow mesh" | the **only** non-sprite, non-instrument consumer of the *unindexed* path `DrawPrimitiveVB` (`Sprite.cpp` x2, `Lenatrace.cpp` is an instrument) | `SceneNode.cpp` |
+| "the white shadow's colour" | the port feeds the mode-10 combiner **`b.matDiffuse` = (1,1,1,1)**, because **`b->flags[3] = 0` in every shipped mode** — the game's own vertex colour never arrives. `t0.aaaa` = 255, so the alpha half is a pass-through | `a7vk3d.vert`, `a7vk3d.frag`, `a7_vk32.c` |
+| "the white patch" | **identify the specimen first.** One was measured twice as **dust** (wheel spray), not a shadow | `SHADOW-MECHANISM-FOUND-20261015`, `SHADOW-CENSUS-BLIND-20261015` |
 | "the combiner" | `Texture::blendMode` -> `CGraphics::ConfigureTextureStageBlendMode`, cases 0-11 and 0xff. The full measured table is §6.7 | `Graphics.cpp` `ConfigureTextureStageBlendMode` |
 
 ---
@@ -103,6 +115,29 @@ Windowed is a **first-class path** — `isFullscreen` only changes the style. Us
 **21 are draws**. **277 are state.** 245 of the 298 are in `Graphics.cpp` alone. Any question
 of the form "does the port handle X" is therefore almost always a question about *state
 mapping*, not about drawing.
+
+### 3.1 THE WORLD IS TEN CALL SITES
+
+`Graphics_DrawMeshLOD(Mesh *pMesh, int useParts, int clampTexture, int markTextures)`
+(`Graphics.cpp`) is the single entry point every visible mesh goes through, and it contains
+**exactly four dispatch paths**:
+
+| path | function | split by |
+|---|---|---|
+| parts, marking | `Graphics_MarkTexturesAndDrawMeshParts` | PART, textures marked used |
+| parts | `Graphics_DrawMeshPartsByTexture` | PART |
+| texture runs | `Game_DrawMeshTextureRuns` | contiguous texture RUN |
+| batches | `Graphics_DrawMeshTextureBatches` | precomputed texture batch |
+
+**All four end in `DrawIndexedPrimitiveVB`.** Measured: **8 call sites in `Graphics.cpp`, 2 in
+`Game.cpp`** -- those ten are the **entire world geometry submission surface** of the game.
+
+`DrawPrimitiveVB` (the unindexed path) has **exactly 3 non-comment sites**: `SceneNode.cpp`
+(the shadow mesh), `Sprite.cpp` (2), and `Lenatrace.cpp` (an instrument).
+
+**Why this matters:** "the world" is not a subsystem you have to go hunting for. It is ten
+calls reachable from one function -- and the shadows are a *separate* path that shares none
+of them. An arm aimed at shadows cannot touch the world by construction.
 
 ---
 
@@ -167,6 +202,27 @@ buffers, 0 `D3DRS_*SHADOW` render states), and `g_colourShadowWhite` being front
 `FrontendScreens.cpp` — no race-time file) all re-verified as true. The claims were sound;
 only the addresses were stale. That is the whole lesson: **a structural fact is durable, a line number is not** — so write
 down the fact, and let the symbol carry it home.
+
+---
+
+### 5.1 THE SAME ROT APPLIES TO *ROUND NAMES*
+
+Added 15 October 2026, same day, one level up from line numbers.
+
+The first draft of `WHAT-IS-LEFT-STANDING.md` cited *"`SHADOW-DRAW-IDENTIFY-20261015`
+measured 21.0 % of shadow triangles degenerate and 36.6 % wound flipped"*. **Both figures
+are real. Neither came from that round.**
+
+* `21.01 % degenerate / 36.59 % flipped / 27.60 % at w <= 0` -> **`SHADOW-CENSUS-BLIND-20261015`**
+  (87,565 triangles tested against their own mvp, on the bytes the GPU reads).
+* `SHADOW-DRAW-IDENTIFY-20261015`'s own numbers are different again:
+  `tri: n=56 tiny=14 flipped=15` = **26.8 % flipped**, on a sample of 56.
+* The `noZone` cap of **1236** is a third round: **`SHADOW-MECHANISM-FOUND-20261015`**.
+
+**Symbols rot. So do attributions.** A citation names a claim *and* the round that produced
+it. If you cannot say which round, you have a number with no home. **Grep the number before
+repeating it** -- three rounds here produced four different shadow statistics, and a
+paragraph that borrowed figures across them looked perfectly authoritative.
 
 ---
 
