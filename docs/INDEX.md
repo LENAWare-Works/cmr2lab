@@ -106,6 +106,7 @@ A document's description is its own first prose line, so it updates itself.
 
 | | |
 |---|---|
+| [`../BLUEPRINT.md`](../BLUEPRINT.md) | **the shape of the game and the port — read this before searching for anything** |
 | [`../README.md`](../README.md) | the front door and the honest status table |
 | [`../progress.md`](../progress.md) | the live status page, rewritten whole each round |
 | [`../archive/`](../archive/README.md) | superseded round logs and delivered notes — nothing deleted |
