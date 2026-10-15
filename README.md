@@ -393,6 +393,7 @@ In rough order, and every item here is a real plan rather than a wish:
 | `docs/INSTALLER.md` | what the installer got wrong, what is verified now, and the one defect found in the pair |
 | `docs/ART-PROVENANCE.md` | the old social preview measured, the new one measured, and an audit of which palette entries really come from the game |
 | `tools/fixes/` | the five fixes, as runnable patch scripts |
+| [`BLUEPRINT.md`](BLUEPRINT.md) | **the shape of the game and the port — read before searching for anything** |
 | `progress.md` | the live status page — rewritten whole each round |
 | `archive/` | superseded round logs and notes, moved out of the active tree — nothing deleted, see its README |
 
