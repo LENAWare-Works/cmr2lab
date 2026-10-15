@@ -6,8 +6,16 @@ material selection or a query the port answers wrongly?"**
 
 Read with `CHECKPOINT.md` (how to re-run) and `DXT-COPY-PATH.md` (the round before).
 Every number below is measured on this Deck tonight, in the game's own binary, in the
-game's own attract-mode route to a race. Where a sentence here disagrees with anything
-written before it, this file wins and says so.
+game's own attract-mode route to a race.
+
+> **THIS FILE IS NOW HISTORY, NOT THE SHAPE. `BLUEPRINT.md` §6 wins.**
+> Appended 2026-10-15 by `TEXTURE-MAPPING-TRUTH-20261015`. The structural facts this file
+> establishes — a `textureId` is a slot, the game never decodes DXT, the index re-base is
+> the road's real bug, the coverage print's top-ten cap manufactured the "never reaches a
+> draw" premise — are all in the blueprint with symbol anchors, end to end, alongside the
+> combiner table and the measured race bindings. **Where this file and `BLUEPRINT.md` §6
+> disagree, the blueprint is right**; the numbers here are the round's evidence, and they
+> are kept as evidence.
 
 ---
 
