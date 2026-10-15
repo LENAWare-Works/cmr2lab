@@ -35,6 +35,7 @@ Each entry is a trap: a word that suggests a system which is not there.
 | **fog in the game** | **the game never turns it on.** `D3DRS_FOGENABLE` is **0 in all 24,369 calls**, uniq=1, across a full race stage. | Fog is a *driver-capability* feature CMR2 shipped behind a flag these tracks do not set. It is a **dead feature in retail**, not a missing port feature. |
 | **a lens flare** | **"FLARE" is a misnomer in the decomp.** | `StageObject_SetForwardedFlareState` → `Graphics_SetFlareStateValue` → `SetRenderState(0x1c, …)`. State `0x1c` is **`D3DRS_FOGENABLE`**. `g_stageLighting[0x25]/[0x26]/[0x52]/[0x53]` drive it. Not a flare, not fog you can see. |
 | **dynamic lighting to reimplement** | **there is none to write.** | The game does all transform and lighting itself before submitting. `lit` measured at a **1.0000 floor** for 99.82 % of vertices. Rewriting lighting math on the port side is rewriting something the game does not ask the device to do. |
+| **"the lighting looks wrong, so the shader/lighting engine must be the problem"** | **there is no lighting engine to fix -- but there IS one device state that is real and dropped. Two different layers. Do not merge them.** | **(a) vertex lighting:** the game computes it and stamps it into `D3DTLVERTEX` before submitting; the port must not reimplement it (`lit` = **1.0000** for 99.82 % of vertices). **(b) the device ambient term:** `D3DRENDERSTATE_AMBIENT` (**state 139**), set from the track's own lighting table. The port **maps it, stores it, and reads it nowhere** -- `grep A7RS_AMBIENT a7_vk32.c` = 0. The shader adds a hardcoded white floor of 1.0 instead, so albedo alone decides the pixel and anything >= 1.0 clamps to 255. This is the standing candidate for "washed out", and for the white end of it. |
 | **mip chains from the driver** | The game *asks* (`Graphics.cpp:1481`, `:1495`) and the driver was expected to build them. | Now ported — but for years this was the "does not exist" entry, and it is why minified terrain flickered. |
 | **alpha on most textures** | Not present in the data. | Stage textures arrive with usable alpha; the all-ones-alpha case was a **decode** fault, not absent data. |
 
@@ -56,6 +57,7 @@ Each entry is a trap: a word that suggests a system which is not there.
 | a "proper" wheel | there is no single wheel part: `L` = **L**ight wheels, `S` = **S**now wheels. Same size because both are a wheel set — **not** left/right | `StageTiming.cpp` string globals |
 | steering / pedals not working | the pad button **stride**: the port wrote button bytes 4 apart where the game reads them 1 apart | fixed 2026-10-13 |
 | dropped state | a `SetRenderState` the game makes and the port accepts with `D3D_OK` and **ignores** | `docs/S2-CENSUS.md` |
+| "the lighting is wrong" / washed out / white-on-white | **not the vertex lighting -- that is the game's business and it is fine** (see §1). The live suspect is the dropped **device ambient** term | state **139**; `docs/AMBIENT-CONTRADICTION-RESOLVED.md` (r8 and the SWEDEN round both right, measuring two different halves of one product) |
 
 ---
 
