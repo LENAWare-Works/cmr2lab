@@ -18,7 +18,9 @@ process, no GPU. Point it at your own copy and it regenerates the car images on 
 CMR2_CARS=/path/to/game/Game/Cars python3 tools/render/make_assets.py
 ```
 
-See [`docs/RENDER.md`](docs/RENDER.md) for the format notes and the three things that are easy
+See [`docs/RENDER.md`](docs/RENDER.md) for the format notes and
+[`docs/RENDER-OPEN-BUGS.md`](docs/RENDER-OPEN-BUGS.md) for what is still wrong with it. Both
+list the three things that are easy
 to get wrong (wheel placement, the livery-vs-AO texture choice, and — measured 15 October
 — **which parts of a `.c3d` are actually the car**).
 

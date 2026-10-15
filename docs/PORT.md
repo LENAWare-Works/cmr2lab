@@ -100,7 +100,8 @@ the numbers above it are confirmed exactly (278 / 20 / 256 state / 22 draws).
    with 0 draws refused.** The "state tracker and pipeline cache" this section
    calls for is built, and it is doing the collapsing it was designed to do.
 2. **It is not SDL3_GPU.** The port uses **32-bit X11 + Vulkan directly** (see
-   `docs/PLATFORM-DECISION.md`); SDL3 was removed, not rebuilt. Any sentence in
+   `PLATFORM-DECISION.md` — written on the Deck, **not yet published to this
+   repository**); SDL3 was removed, not rebuilt. Any sentence in
    this repo that still says SDL3_GPU is describing the road not taken.
 
 **What is actually missing is state fidelity, and it is measured:** of the 18

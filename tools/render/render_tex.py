@@ -11,8 +11,15 @@ Two stages:
                at the four corners. WHEEL_X/Y/Z are the axle positions for the
                CMR2 fleet; a car with a different track or wheelbase needs these
                adjusted, which is the same constraint the engine has (see
-               docs/CAR-FORMAT.md -- physics reads halfExtents + wheelPos[4]
-               and never consults the mesh).
+               docs/CAR.md -- physics reads halfExtents + wheelPos[4] and never
+               consults the mesh).
+
+               KNOWN DEFECT, measured 15 Oct: WHEEL_X / WHEEL_Z are ONE
+               hardcoded constant for the whole fleet, so a 3.08 m Mini gets
+               the same corners as a 4.31 m Subaru. The per-car positions are
+               already in the file -- they are the scene nodes the Deck viewer
+               reads -- so this is guessing where the data exists. Only the
+               205 has been checked against its real track.
 
   render(...)  z-buffered scanline rasteriser with per-pixel interpolated
                normals, two directional lights, specular, and UV0 texturing.
@@ -87,7 +94,11 @@ def build(cid, skip_parts=(), skip_non_body=True):
 
 def make_wheels(P, V, N, UV, T, TP):
     """the four wheel parts' triangles, placed at their axle positions too.
-    Used for measuring the true contact line."""
+
+    DEAD CODE -- measured 15 Oct: nothing in this repository calls this. It was
+    written to measure the true contact line and that measurement is now done in
+    make_assets.hero() from the render mask instead. Left in place rather than
+    deleted so the next reader does not rewrite it, but do not assume it runs."""
     wids = [p['idx'] for p in P if 'Whl' in p['name']]
     if not wids:
         return None

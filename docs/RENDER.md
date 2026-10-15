@@ -26,6 +26,12 @@ The field map in `c3dlib.py` is measured from the files, not inferred — see
 
 ---
 
+**The full open-defect list for this pipeline — including the ones NOT fixed — is
+[`RENDER-OPEN-BUGS.md`](RENDER-OPEN-BUGS.md).** Read it before trusting any number
+here as complete.
+
+---
+
 ## The three things that are easy to get wrong
 
 ### 1. A car is not one mesh, and the wheels are not where you think

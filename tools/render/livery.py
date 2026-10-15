@@ -3,9 +3,11 @@
 
 The part names in a .c3d are literal: "01WhlLOD00", "24semitran", "14LigEffect",
 "21bonunder". So the assignment is by name, with one real subtlety -- there are
-usually TWO body textures and only one is the livery. The other is a grey
-ambient-occlusion pass. pick_livery() chooses by saturation, because the name
-suffixes are not stable across the fleet.
+usually TWO body textures and only one is the livery. Which one that is was
+settled by looking at them, not by rule: `ap5dbodf` carries the decals, and
+`ap5bodbu` does not. pick_livery()'s saturation test nominally automates that
+choice, but see its docstring -- on this fleet it is ranking on decode noise.
+The name suffixes are not stable across the fleet, which is why it exists.
 
 Parts deliberately left untextured: the lights and the underbody. In the engine
 these are unlit / additive, and giving them a body texture makes them look

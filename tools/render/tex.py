@@ -68,7 +68,22 @@ def first(seq):
 
 
 def pick_livery(d):
-    """the colourful 'bod' texture is the livery; the grey one is an AO pass."""
+    """Pick the livery texture for a car.
+
+    HONEST NOTE, measured 15 Oct: the saturation test below does NOT do what the
+    name suggests. Every candidate in the 205 is near-grey once decoded
+    (ap5dbodf sat 0.06, ap5bodbu sat 0.00), so the ranking is decided by
+    hundredths that are indistinguishable from decode noise.
+
+    It has returned ap5dbodf on every run so far, and ap5dbodf IS the one
+    carrying the decals (Michelin / Bilstein / SKF / Peugeot / a race number) --
+    but that was confirmed by LOOKING at the textures, not by this function. The
+    "AO pass" description in the previous docstring was an assertion that was
+    never measured.
+
+    Do not treat a change in this function's output as an improvement until the
+    new pick has actually been looked at.
+    """
     cands = [k for k in d if 'bod' in k and 'df' in k] or [k for k in d if 'bod' in k]
     best, bs = None, -1.0
     for k in cands:
