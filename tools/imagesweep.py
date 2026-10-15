@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """imagesweep.py -- read the header dimensions of every candidate file, to answer
 "does file X exist on this disk" without a vision pass. Built 2026-10-11 for
-ONE-WHEEL-FRAME. Feed it a file list (one path per line)."""
+../archive/docs/ONE-WHEEL-FRAME.md. Feed it a file list (one path per line)."""
 
 def dims(path):
     try:

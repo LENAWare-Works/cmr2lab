@@ -1,0 +1,52 @@
+[
+ {
+  "kept": "frames/20261014-1750-fog-first-state/forced-fogC/pair00_fogON_frame3402.png",
+  "removed": "frames/20261014-1750-fog-first-state/forced-fogC/pair01_fogON_frame3402.png",
+  "md5": "adcdb34fb36e9a11f9fe6c65bbc85ae4"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/forced-fogC/pair01_fogOFF_frame3404.png",
+  "removed": "frames/20261014-1750-fog-first-state/forced-fogC/pair02_fogOFF_frame3404.png",
+  "md5": "7e4ef05f83601ebb540d19fe2bb9be2f"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/forced-fogC/pair02_fogON_frame3406.png",
+  "removed": "frames/20261014-1750-fog-first-state/forced-fogC/pair03_fogON_frame3406.png",
+  "md5": "fe9a9fb1d1929180dbc57c948af262d7"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/forced-fogC/pair03_fogOFF_frame3408.png",
+  "removed": "frames/20261014-1750-fog-first-state/forced-fogC/pair04_fogOFF_frame3408.png",
+  "md5": "2b07f32ba1ff82b820b9904744f50ba9"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/forced-fogC/pair04_fogON_frame3410.png",
+  "removed": "frames/20261014-1750-fog-first-state/forced-fogC/pair05_fogON_frame3410.png",
+  "md5": "37ebe0e660cbbe7f0c7d36f6bffb9d79"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/unforced-fogD/pair00_fogON_frame3402.png",
+  "removed": "frames/20261014-1750-fog-first-state/unforced-fogD/pair01_fogON_frame3402.png",
+  "md5": "9f6b49b206566261f627448abfdb27c2"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/unforced-fogD/pair01_fogOFF_frame3404.png",
+  "removed": "frames/20261014-1750-fog-first-state/unforced-fogD/pair02_fogOFF_frame3404.png",
+  "md5": "85c99b2dea88e582f2abc49c2f311361"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/unforced-fogD/pair02_fogON_frame3406.png",
+  "removed": "frames/20261014-1750-fog-first-state/unforced-fogD/pair03_fogON_frame3406.png",
+  "md5": "e3c1ca7d703091f4dcf657004ea58ad3"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/unforced-fogD/pair03_fogOFF_frame3408.png",
+  "removed": "frames/20261014-1750-fog-first-state/unforced-fogD/pair04_fogOFF_frame3408.png",
+  "md5": "aded4979604f0204b409be1f85d4fe8a"
+ },
+ {
+  "kept": "frames/20261014-1750-fog-first-state/unforced-fogD/pair04_fogON_frame3410.png",
+  "removed": "frames/20261014-1750-fog-first-state/unforced-fogD/pair05_fogON_frame3410.png",
+  "md5": "b69b4e7de1c02b67141132e6c30f20c1"
+ }
+]

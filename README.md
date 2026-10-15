@@ -394,6 +394,7 @@ In rough order, and every item here is a real plan rather than a wish:
 | `docs/ART-PROVENANCE.md` | the old social preview measured, the new one measured, and an audit of which palette entries really come from the game |
 | `tools/fixes/` | the five fixes, as runnable patch scripts |
 | `progress.md` | the live status page — rewritten whole each round |
+| `archive/` | superseded round logs and notes, moved out of the active tree — nothing deleted, see its README |
 
 **Still reading? [`docs/INDEX.md`](docs/INDEX.md) maps every document in this repo —
 reference first, then the engineering journal.** If a word in this README was unfamiliar, it's

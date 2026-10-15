@@ -456,7 +456,7 @@ plate is B).
 
 ## 12a. CORRECTION TO §12 — candidate C predicts this measurement AT LEAST as well
 
-A peer round landed in this repo at **09:03** (`docs/MENU-CAR-ROUND2.md`, `tools/patch_menudraw.py`)
+A peer round landed in this repo at **09:03** (`../archive/docs/MENU-CAR-ROUND2.md`, `tools/patch_menudraw.py`)
 while §12 was being written, and it does the arithmetic on **candidate C** — the preview's own
 converted vertices being **32-byte 16.16 fixed** (`Unk0x0082d220VertexFixed`, `GameInfo.cpp:1383`,
 built by `OptionPreview_AllocateConvertedWheelVertices`, `GameInfo.cpp:7727`) while the port's
