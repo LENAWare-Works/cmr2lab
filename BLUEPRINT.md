@@ -14,8 +14,10 @@ Two rules for this file:
 2. **If you learn something structural, add it here the same day.** Not in a round report.
    Round reports are history; this is the shape.
 
-Measured 15 October 2026 against `CMR2Decomp`. Anchors are `file:line` where the anchor is
-stable, file only where it is not.
+Measured 15 October 2026 against `CMR2Decomp`. **Anchors are symbol names, not line
+numbers** — see §5 for why, and for the `git grep -n 'SYMBOL'` incantation that always
+resolves one. Line numbers appear only where a symbol does not exist to hang them on, and
+they are marked `≈` when they drift.
 
 ---
 
@@ -26,9 +28,9 @@ Each entry is a trap: a word that suggests a system which is not there.
 | you will look for | the truth | what it actually is |
 |---|---|---|
 | **shaders** | **there are none.** D3D7 fixed-function only. | The game submits `D3DTLVERTEX` — positions already transformed, lighting already applied, in software. The device does viewport transform, rasterise, texture-stage cascade, alpha test, fog, blend, z-test. Nothing else. |
-| **shadow maps / shadow volumes / stencil shadows** | **none exist.** `ShadowVolume`, `ShadowMap`, `ShadowBuffer`, `StencilShadow` appear in **0 files**. | Shadows are **geometry**. Real meshes emitted per scene node, streamed into one vertex buffer between `Scene_BeginShadowBatch()` / `Scene_EndShadowBatch()` (`RallyData.cpp:6242–6265`), split into `{first vertex, vertex count, texture, …}` (`SceneNode.cpp:1599`). |
+| **shadow maps / shadow volumes / stencil shadows** | **none exist.** `ShadowVolume`, `ShadowMap`, `ShadowBuffer`, `StencilShadow` appear in **0 files**. | Shadows are **geometry**. Real meshes emitted per scene node, streamed into one vertex buffer between `Scene_BeginShadowBatch()` / `Scene_EndShadowBatch()` (`Scene_BeginShadowBatch` / `Scene_EndShadowBatch`), split into a flat `int[4]` record `{firstVertex, vertexCount, textureIndex, viewMask}` (`Scene_DrawShadowBatches`, `SceneNode.cpp:2514`; the cursor walks it at `+= 4`). |
 | **any shadow render state** | **none.** There is no `D3DRS_*SHADOW` or `D3DTSS_*SHADOW` anywhere. | Confirms the above: shadows cannot be a lighting effect because nothing in the device state describes one. |
-| **one shadow system** | **There are THREE, and the word alone does not tell you which.** This is the single biggest source of wasted searching here. | **① frontend menu text** (drop shadows behind UI text, `FrontendMenus.cpp`, palette `g_colourShadowWhite` / `…Text` / `…Dim`) · **② the car's own shadow** (`CarPhysics.cpp:414–519`, octagon + core, `Quad2D_QueueFixedTriangle(…, NULL, (Quad2D *)10)` — texture **NULL by design**, colour lives in the vertex) · **③ scene shadow geometry** on terrain and foliage (`Scene_AddShadowCaster` `StageTiming.cpp:8011` → `Scene_EmitNodeShadowGeometry` `RallyData.cpp:6110` → batched `Scene_BeginShadowBatch`/`EndShadowBatch` `RallyData.cpp:6242/6265`). |
+| **one shadow system** | **There are THREE, and the word alone does not tell you which.** This is the single biggest source of wasted searching here. | **① frontend menu text** (drop shadows behind UI text, `FrontendMenus.cpp`, palette `g_colourShadowWhite` / `…Text` / `…Dim`) · **② the car's own shadow** (`CarPhysics.cpp` `SHADOW_OCTAGON`/`SHADOW_CORE` macros, octagon + core, `Quad2D_QueueFixedTriangle(…, NULL, (Quad2D *)10)` — texture **NULL by design**, colour lives in the vertex) · **③ scene shadow geometry** on terrain and foliage (`Scene_AddShadowCaster` → `Scene_EmitNodeShadowGeometry` → batched `Scene_BeginShadowBatch`/`Scene_EndShadowBatch`). |
 | **that `g_colourShadowWhite` is the white terrain patches** | **It is not.** That variable is **frontend menu text**. | A confident wrong answer I nearly published. The race-time flat-shadow combiner is texture-stage **mode 10** (`Graphics.cpp` `case 10:`): `COLORARG1 = D3DTA_TEXTURE \| D3DTA_ALPHAREPLICATE`, `COLORARG2 = D3DTA_DIFFUSE`, `COLOROP = MODULATE` — **the texture is used as an alpha mask**, modulated by the vertex colour. |
 | **fog in the game** | **the game never turns it on.** `D3DRS_FOGENABLE` is **0 in all 24,369 calls**, uniq=1, across a full race stage. | Fog is a *driver-capability* feature CMR2 shipped behind a flag these tracks do not set. It is a **dead feature in retail**, not a missing port feature. |
 | **a lens flare** | **"FLARE" is a misnomer in the decomp.** | `StageObject_SetForwardedFlareState` → `Graphics_SetFlareStateValue` → `SetRenderState(0x1c, …)`. State `0x1c` is **`D3DRS_FOGENABLE`**. `g_stageLighting[0x25]/[0x26]/[0x52]/[0x53]` drive it. Not a flare, not fog you can see. |
@@ -43,9 +45,9 @@ Each entry is a trap: a word that suggests a system which is not there.
 | what people say | what it is | anchor |
 |---|---|---|
 | the road / the track | a stage; loaded by `Race_LoadSelectedStage()`, returns 1 on success | `Race.cpp` |
-| white shadows (on terrain / foliage) | **scene shadow geometry** — real meshes emitted per node, batched, drawn flat. NOT a lighting effect and NOT the `g_colourShadowWhite` variable | `StageTiming.cpp:8011` → `RallyData.cpp:6110` → `RallyData.cpp:6242/6265` |
-| white box under the car | the car's **own** shadow, a separate path: octagon + core, texture NULL by design, then texture-stage **mode 10** (texture as alpha mask × vertex colour) | `CarPhysics.cpp:418`; combiner at `Graphics.cpp` `case 10:` |
-| `g_colourShadowWhite` | **frontend menu text shadow** — nothing to do with the race | `FrontendMenus.cpp:1238` |
+| white shadows (on terrain / foliage) | **scene shadow geometry** — real meshes emitted per node, batched, drawn flat. NOT a lighting effect and NOT the `g_colourShadowWhite` variable | `Scene_AddShadowCaster` → `Scene_EmitNodeShadowGeometry` → `Scene_BeginShadowBatch`/`Scene_EndShadowBatch` |
+| white box under the car | the car's **own** shadow, a separate path: octagon + core, texture NULL by design, then texture-stage **mode 10** (texture as alpha mask × vertex colour) | `CarPhysics.cpp` `SHADOW_TRIANGLE`; combiner at `Graphics.cpp` `case 10:` |
+| `g_colourShadowWhite` | **frontend menu text shadow** — nothing to do with the race | `g_colourShadowWhite0x00524974` (`FrontendDraw.cpp`) |
 | the sim / interior pass | `05`/`06`-prefixed parts — unlit or additive, **not bodywork** | `.c3d` part-name prefix |
 | light effects | `14`-prefixed parts — additive flares | `.c3d` part-name prefix |
 | underbody sim | `15`-prefixed parts | `.c3d` part-name prefix |
@@ -76,7 +78,7 @@ Windowed is a **first-class path** — `isFullscreen` only changes the style. Us
 
 | subsystem | file | lines | what it owns |
 |---|---|---|---|
-| graphics / device | `Graphics.cpp` | 7,331 | **82 % of all D3D7 calls live here**, and only 4 other files touch D3D7 at all |
+| graphics / device | `Graphics.cpp` | 7,566 | **229 of the tree's 289 device-state/draw call sites (79 %) live here**; 6 other files touch the device at all — `Sprite.cpp` 19, `Game.cpp` 18, `SceneNode.cpp` 16, `StageTiming.cpp` 6, `StageObjects.cpp` 2, `Race.cpp` 2. (Was "82 % / only 4 other files": re-measured 2026-10-15, see §5.) |
 | scene graph | `SceneNode.cpp` | 2,817 | nodes, shadow batches, per-node geometry emission |
 | game / main loop | `Game.cpp` | 3,586 | state machine, viewport, fog enable |
 | race logic | `Race.cpp` | 5,464 | stage load, race state, per-frame resources |
@@ -93,6 +95,9 @@ mapping*, not about drawing.
 
 ---
 
+
+---
+
 ## 4. HOW TO USE THIS
 
 * **Before searching for a word**, check §1 and §2. If the word is in §1, the system does not
@@ -102,3 +107,49 @@ mapping*, not about drawing.
   will be re-derived by someone else next week.
 * **Facts here are measured, not remembered.** If one disagrees with the code, the code wins
   and this file is wrong — fix it.
+* **Cite the symbol, name the tree.** §5. A `file:line` here is a footnote, not the anchor.
+
+---
+
+## 5. HOW TO CITE — anchors that survive, because these ones did not
+
+Added 15 October 2026, the same day as this file, because **this file's own first draft
+shipped anchors that were already wrong when it was pushed.** Every anchor below was
+re-verified against the tree; **all six** were off or false:
+
+| anchor as first written | symbol's actual line | why it moved |
+|---|---|---|
+| `StageTiming.cpp:8011` (`Scene_AddShadowCaster`) | **8029** | uncommitted edits in the tree the file was measured against |
+| `RallyData.cpp:6110` (`Scene_EmitNodeShadowGeometry`) | **6138** | same — **and this one moved *forwards*** |
+| `RallyData.cpp:6242` (`Scene_BeginShadowBatch`) | **6135** | same tree, **different direction** |
+| `FrontendMenus.cpp:1238` (`g_colourShadowWhite`) | **1234**, and the flag lives in **`FrontendDraw.cpp:23`** | 1238 was the *call site* in a menu-draw routine, not the definition |
+| `SceneNode.cpp:1599` ("split into `{first vertex, vertex count, texture}`") | **`Scene_DrawShadowBatches`, `SceneNode.cpp:2514`** | **plain wrong file position** — 1599 is a file-buffer *free* routine, nothing to do with shadow batches. The correct record is a flat `int[4]` = `{firstVertex, vertexCount, textureIndex, viewMask}`, consumed by the cursor at `SceneNode.cpp:2526` (`+= 4`) |
+| `Graphics.cpp` = "82 % of all D3D7 calls", "only 4 other files touch D3D7" | **79 % (229 of 289)** and **6 other files** | re-measured; the old number was either from a different tree or a different denominator — either way it was asserted, not measured |
+
+**Six anchors, six different displacements, some of them in opposite directions — and two
+of them wrong outright, not merely stale.** The cause is not one-off sloppiness: it is
+structural. the `CMR2Decomp` working tree in
+`~/.lena_cmr2/repo` carries **thousands of lines of uncommitted edits** (1,554 changed lines
+across just those four files), and it sits **116 commits behind `origin/main`**, where the
+same symbols land on entirely different lines again (`Scene_AddShadowCaster` is at **8060**
+on `origin/main` and **8029** locally). Add a line anywhere above a symbol and every
+`file:line` below it silently becomes a lie that still *looks* verified.
+
+**So: cite symbols, not lines.** The line number is the one part of an anchor that is
+guaranteed to rot and the one part that reads as most authoritative.
+
+    git grep -n 'SYMBOL'          # or: git grep -n 'SYMBOL' -- '*.cpp'
+    git grep -n 'SYMBOL' origin/main
+    git grep -n 'SYMBOL' HEAD --   # which commit am I even reading?
+
+**Say which tree you measured.** `HEAD`, working tree, or `origin/main` — they do not agree,
+and "I checked the code" means nothing without it. A claim verified against a dirty tree is
+verified against nobody's tree.
+
+**What survived was right and what moved was noise.** Everything §1 and §2 *assert* about
+the three shadow paths, mode 10, the negative space (0 files for shadow maps / volumes /
+buffers, 0 `D3DRS_*SHADOW` render states), and `g_colourShadowWhite` being frontend-only
+(it appears in exactly 4 files: `FrontendDraw.cpp/.h`, `FrontendMenus.cpp`,
+`FrontendScreens.cpp` — no race-time file) all re-verified as true. The claims were sound;
+only the addresses were stale. That is the whole lesson: **a structural fact is durable, a line number is not** — so write
+down the fact, and let the symbol carry it home.
