@@ -1,414 +1,204 @@
-# CMR2LRE live progress
+# THE TEXTURE PATH IS IN THE BLUEPRINT — 2026-10-15 14:0x — `TEXTURE-MAPPING-TRUTH-20261015`
 
-**Updated 2026-10-15T00:40:00+03:00 EEST by the phone-side Lena.**
+**Short version: `BLUEPRINT.md` §6 is the game renderer's texture path, end to end, every
+link on a symbol. It is pushed. The three things everyone calls "which texture" are now
+separated by name. And I clobbered origin/main mid-push and put it back — that is in the
+report because it nearly cost another lane their commit. Full write-up:
+`work/TEXTURE-MAPPING-TRUTH-20261015/REPORT.md`.**
 
-This page is a coordination update. It does not pretend that a worker has finished work
-that has not produced a report.
+## 1. THE CORRECTION THAT STARTED THIS
 
-## 2026-10-15 ~00:40 EEST — THE ROAD SEPARATES FROM THE TERRAIN
+He said: *"the text was for the renderer yes, textures fucked, this needs to be mapped
+correctly and then put in the blueprint."* The texture work had been verified against the
+**CAR POSER** — a different program with a different texture path. So the complaint was
+never answered. §6 is the renderer.
 
-**This is the wall that has stood since 2026-10-05, and it is down.**
+## 2. THE ROOT, AND IT IS PORT CODE
 
-Measured on the promoted near-clip build (`1c0bee6a`), keyless attract route, one run,
-ring `gfx_0.0.0` timeout delta **0**, **zero keys injected**. Eight captures; `03_race`
-through `07_race_e` are a real race entered by the game's own attract route.
+**The game has no DXT decoder and cannot have one.** `CGraphics::LoadDDSTexture` writes the
+*block bytes* into a system surface and calls `Blt`; `CreateTextureSurface` then asks the
+driver for a DXT texture surface via `textureInfo4`. Decompression is **driver** work. On
+this port the driver is `DeckSurface7::Blt`, which did no format conversion until
+**2026-10-11** — block bytes reached the RHI as ARGB. Ported as `dl_decode`, `LENA-DXTBLT`.
+Stage textures are DXT5; frontend and cars are TGA. **A texture complaint splits at that
+line and must say which side it is on.**
 
-`road_edge` — the same metric used for the Sweden snow stage:
+## 3. THE TRAP, NOW §6.0
 
-| frame | `road_edge` | note |
-|---|---|---|
-| `03_race` | 0.486 | camera pitched up, sky in frame |
-| `04_race_b` | **6.985** | |
-| `05_race_c` | 1.427 | camera straight down |
-| `06_race_d` | **7.901** | |
-| `07_race_e` | 1.515 | |
+Three different things get called "which texture":
+**(a) the per-face texture id** — a slot, `textureBuffer[2048]`
+**(b) the texture-STAGE combiner mode** — `Texture::blendMode` -> `ConfigureTextureStageBlendMode`
+**(c) the blend** — `D3DRS_SRCBLEND`/`DESTBLEND` via `SetCachedSourceDestinationBlend`
 
-Against the record: **Sweden's undrivable white-on-white was 1.04 mean / 0.96 median.**
-Round 5's race frames sat at ≈0.95 with 66-77 % of the frame in one luma octile. **Two of
-five race frames now measure 6.99 and 7.90 — above Kenya's 4.93.**
+Conflating them is what let "every `RD_*` road texture never reaches a draw" survive a
+round. The real cause was `DeckDevice7::DrawIndexedPrimitiveVB` re-basing an index array
+`Mesh_BuildParts` had already re-based: 404,000 of 404,000 draws fit the game's convention
+and 0 fit the port's.
 
-Three independent tests agree:
+**The nicest confirmation is in the shadow path.** `Scene_DrawShadowBatches` writes mode 10
+onto the Texture, binds, then restores it — so the *stored* `blendMode` is 0 and the
+combiner is 10. §6.4's measured `texBlend=0` and §1's mode-10 entry are both true and are
+not the same number. That is (a)/(b)/(c) confusing people in the wild.
 
-1. **Colour separation.** Frame 03's ground is 8 coherent dirt materials in one ochre
-   family (`#986828` 18.8 %, `#a87828` 12.8 %, `#986818` 12.1 %) with runs up to 184 px
-   and 121 luma between the top two. A wash is one material with no contrast.
-2. **The edge tracks.** The strongest adjacent-row step moves **monotonically** from
-   x≈700 at y460 to x≈580 at y580. That is a road edge receding, not speckle.
-3. **Independent measurement, different code.** The phone side pulled the raw frames and
-   measured ground `|dL/dx|` directly: frame 03 = **1.68**, frame 04 = **14.50** — 8.6×
-   more structure. Same direction, same verdict, separate implementation.
+## 4. MEASURED, NOT RE-RUN — AND SAID SO
 
-And a vision pass on frame 04 reads it as a dirt track with edges distinct from the
-terrain, running from the lower-right foreground, curving left, continuing to the upper
-right — with a solid, textured car on it.
+Item 4 (which texture each stage draw binds) is measured from **evidence already on disk**:
+three instruments, two rounds' runs — 232/232 bind lines are `stage=0`; stage 1 carries
+**zero** coverage over 13 frames and two runs; 65 ids carry draw coverage post-index-fix;
+six shadow batches cycle three ids (144/145/146).
 
-### The honest half
+**I did not launch a GPU run and the brief said to coordinate, not collide.** The sibling
+`SUBTRACT-THE-PROBLEM-20261015` had the GPU from 13:50, and `play-handover.sh --check`
+returned **`REFUSE G4`** — he launched a game at 13:19:53, inside the 45-minute quiet
+window. A second `cmr2` beside his is what wedged his display on 10-11. §6.4 says plainly
+that the runs are not this round's. A fresh per-stage run would strengthen it and is still
+worth doing.
 
-- **The road does not yet recede to a horizon.** `converge` is +0.31 / +0.14 / +0.85 —
-  positive, a real tendency, but weak and inconsistent. You can see the road under you;
-  you cannot yet see it *going* anywhere. The best edges in frame 07 run *across* the
-  frame, not into it.
-- **The ground reads poorly from directly above** (frame 06: 8 materials at `run_med=13`).
-  Same road, worse angle — not a second defect.
+## 5. THE PUSH, AND THE NEAR-MISS
 
-## THE NEW #1 DEFECT: THE SKY IS CLIPPED TO PURE WHITE
+I clobbered `origin/main` with a stale commit. `--force-with-lease=refs/heads/main:<sha>`
+guards **the ref you name**, and my tracked `main` and my HEAD had diverged, so the lease I
+took did not cover what I was pushing. Caught it from the push output within seconds,
+verified that both the clobbered commit and the other lane's `fbcb92e` were **ancestors of
+my HEAD** (nothing lost), and restored by pushing the explicit sha. Remote now reads
+`09ea7f0`; a fresh clone is md5-identical to local. **The other lane's lighting commit
+survived because it was already in my history, not because I was careful. Verify ancestry
+before ever forcing.**
 
-The white band is not where it was. The old y500-600 finding **does not reproduce** — the
-object it was measured over (`#cbccce`) is not in these frames, and the near clip that was
-excluded as its cause is now actually fixed.
+## 6. WHAT LANDED
 
-What is there is larger, unambiguous, and at the **top**:
-
-```
-now.03_race:  >=250 = 9263 px = 9.05 % of frame
-              all of it in the sky band; 0 px in every band below
-              80 rows of EXACT 255, hard step at both ends
-              >=250 and >=240 counts nearly equal (9263 vs 9716)
-              = nothing between 240 and 250, no soft falloff
-```
-
-**Confirmed independently:** the phone side measures **63.4 %** of the top 80 rows at
-exactly 255 in frame 03 and **0.0 %** in frame 04.
-
-It is **world-locked, not a screen overlay** — proved by the other frames. Top-80-row mean
-luma: `02_pre 172.6`, `03_race 214.1`, `04 105.1`, `05 60.5`, `06 92.3`, `07 93.5`. The
-white appears **only** when the camera pitches up enough to see sky, and vanishes entirely
-when it looks down. A screen-space effect cannot do that.
-
-**It is the skybox, and it is being crushed to `#ffffff`.** Same failure shape that made
-Sweden undrivable, relocated from the ground to the sky. His eye needs the horizon to read
-attitude; right now the horizon is a hard step from `#ffffff` to `#808e94`.
-
-**Not the near clip** — measured after the fix, and it dies when the camera pitches down.
-
-## THE CAR IS THE BEST-RENDERED THING IN THE FRAME
-
-Worth saying plainly. The edge map puts the car's silhouette, both wheel arches, the door
-number and the livery as the **clearest closed contour in the image** — sharper than
-anything in the terrain. Whatever is still on the list, the car is not on it.
-
-And the frontend path is working end to end: menu car, **setup** and **repair** screens all
-render, confirmed by Miami directly.
-
-## Handover
-
-**None.** This round measured the promoted build as it stands — nothing built, nothing
-modified, the play path never opened for write, `gold/` untouched. The next round
-investigates the skybox material.
-
-**Honesty line:** this section claims the road separates from the verge, measured three
-ways. It does **not** claim the road recedes to a horizon, and it does not claim the
-picture is finished — the sky is still a white rectangle in a fifth of the frames.
-
-## 2026-10-15 ~00:20 EEST — THE NEAR CLIP IS LIVE, THE AMBIENT IS DEAD, AND THE PLAY PATH CAN NO LONGER BE SILENTLY SWAPPED
-
-Three things landed since the last revision. All three are measured. None of them is a
-claim that the picture is fixed.
-
-### 1. THE NEAR CLIP IS PROMOTED AND LIVE
-
-`PLAY/out-plain/cmr2` is now md5 `1c0bee6ad2e92c23ca8f36289f7b5b77` — the build measured
-at **8.3 % dropped vs 90.8 % control**. The old constant plane (5.86) was deleting
-**90.8 % of every triangle the game submitted**; the promoted build keeps **4.9× more**.
-Ring `gfx_0.0.0` timeout delta **0**. Behind-eye geometry is removed identically in both
-arms — the plane still bites, it just bites in the right place.
-
-This outranks any dropped state on the checklist. Nine tenths of the geometry was being
-thrown away, and **nobody had looked at the race picture since that changed.** The next
-round measures the picture on this build rather than chasing another state.
-
-### 2. THE AMBIENT FIX IS FALSIFIED — WITH THE MECHANISM, NOT JUST THE VERDICT
-
-`work/AMB-AB-20261015/`. Two GPU runs, ~7.7 minutes. One question per run. Ring delta 0.
-
-The predicted fix was: read `rs[A7RS_AMBIENT]` instead of the hardcoded white material
-ambient, and the snow would darken and get its edges back. It does not. It **deletes the
-picture**, and the run's own numbers say why:
-
-```
-ARM DRAW TALLY: amb_fills=2899240  rs139==0: 2781948 (95.95%)  rs139!=0: 117292 (4.05%)
-```
-
-**95.95 % of the 2.9 million draws the arm touched read `rs139 = 0x00000000`.** The arm
-multiplies the lighting term by zero on almost every draw. `zero%` goes **0.005 % → 65.2 %**
-across the run and **0.006 % → 88.64 %** on the snow stage. A frame that is 88.6 % exactly
-black has no edges by construction — so `road_edge 0.861 → 0.758` is not a reading of the
-fix, it is a reading of the absence of a picture.
-
-The 2026-10-12 GRFX-AB negative **reproduces on today's binary to three digits**:
-
-| snow metric | GRFX-AB 10-12 (`a68bb585…`) | AMB-AB 10-15 (`1813b0a3…`) |
-|---|---|---|
-| frame mean ratio | 0.137 | **0.137** |
-| zero % (AMB arm) | 88.7 | **88.64** |
-| road_edge ratio | 0.872 | **0.880** |
-| road_sd ratio | 2.680 | **2.693** |
-
-Two independent builds, four days apart, same defect, same numbers. That is a reproducible
-measurement, not a one-off. **The straight-substitution ambient fix is dead.**
-
-### 3. FOG IS CLOSED — ONE OBSERVED VALUE IN EVERY STAGE
-
-`state 28` (`D3DRS_FOGENABLE`) is **0 in every one of the three stages the attract route
-walked** — 25,626 in-stage calls, 28,370 calls in the run, `nonzero=0`. Not "zero on
-average": **one single value observed, `0`, everywhere.** Fog does not exist in retail
-CMR2 on these tracks. The caps fix stays and is not wasted (it is why 35/140/36/37 arrive
-at all), but it could never have turned fog on — the enable is a different, ungated path,
-and that path says no.
-
-### 4. THE PLAY PATH IS REGISTRY-GATED — THIS WAS A REAL FAILURE, AND IT IS FIXED
-
-On 2026-10-14 at 22:35:49 a round script copied an **intermediate** build onto the play
-path while Miami was playing. That build carried a first-revision near-clip patch with a
-units bug, so it behaved exactly as if it had no patch at all. The build it replaced was
-better. He found out by launching the game and finding it broken.
-
-The root cause was not the patch. It was that **nothing in the project had a concept of
-"which build is current"** — 21 separate round scripts each had their own copy step onto
-that path, and the only gate asked *"can a car drive."* The bad build could drive. It just
-rendered wrong.
-
-What exists now:
-
-- `PLAY/REGISTRY.json` names the one md5 that is playable.
-- `~/lena/bin/lre` is the **only** thing allowed to write the path. It refuses a candidate
-  that cannot drive, keeps the previous build in `gold/`, and writes the registry.
-- `cmr2lre.sh` checks the path against the registry **before it starts anything** and
-  restores the registered build from `gold/` if they disagree.
-- `lre-watchdog.timer` repeats that check **every 5 minutes**, so a clobber is caught while
-  he is away from the machine rather than at his next launch.
-
-**Verified by deliberately corrupting the file and watching it self-heal**, twice — once
-via the launcher, once via the watchdog. `ROUND-DISCIPLINE.md` carries the rule and the
-reason.
-
-### 5. THE FRONTEND 3D PATH IS WORKING
-
-Miami's own report, 2026-10-14: the **206 renders fine**, and the pre-race **SETUP** and
-**REPAIR** car screens both work. All three need the mesh, the transform **and** the
-textures to land together — so this is the whole menu-car rendering path, not one screen.
-
-### CORRECTION TO THE PREVIOUS REVISION
-
-That revision stated the Deck daemon was **NOT running** and had picked up nothing for
-~2h30m. That was true when written at 15:12 and is **false now** — the daemon is active
-and has been working rounds all evening. Corrected here rather than quietly overwritten.
-
-### WHAT IS STILL NOT TRUE
-
-- **The road still does not separate from the terrain.** That is the defect, unchanged.
-- No picture claim is made about the promoted near-clip build. The measurement is running.
-- The white band now has one exclusion: the near clip is **not** its cause (present and
-  identical at the same place with the clipper off, bands within 0.4 pp between arms).
-
-**Honesty line:** this section publishes two falsifications, one promotion and one
-infrastructure fix. It does not claim the port is finished, and it does not claim the race
-picture looks right — only that the geometry is no longer being thrown away and the build
-he launches cannot be silently replaced by a worse one.
-
+* **`BLUEPRINT.md` §6** — ~390 lines, the whole path, plus **§1** four new negatives
+  (no shaders on the texture path, no DXT decoder in the game, exactly one texture-NULL
+  draw, never a stage beyond 2), **§2** four new vocabulary rows, **§4** a pointer.
+* **`docs/ROAD-TEXTURE-OWNER.md`** — a header saying the file is history and §6 wins. The
+  brief said do not leave two versions standing.
+* **Merged, not overwritten** — a sibling lane pushed a §1/§2 lighting entry while I wrote
+  §6. Both are additive; both are in. 0 markdown table mismatches after the merge.
+* **NOT done:** the fresh item-4 run. Reason above, and it is a reason and not an excuse.
+* **Status: done — the path is mapped and published.**
 
 ---
 
-## 2026-10-14 ~20:50 EEST — THE ENABLE CENSUS: FOG IS ANSWERED
+# AMBIENT 139 IS A NEGATIVE — AND THE PLAY PATH IS STUCK IN A LOOP SOMEBODY HAS TO BREAK — 2026-10-15 11:45 — `AMBIENT-139-AB-20261015`
 
-The measurement the corrected spec's step 2 asked for has been made, and it came back **zero in
-every stage**. Instrumented the value passed at the live state-28 site (`Game.cpp:2709`,
-`SetRenderState(0x1c, Graphics_GetFlareStateValue())`) and ran the attract route with **no keys
-injected, no forced fog, no synthetic input of any kind** — 420 s.
-
-```
-[ENABLE] frames=17422 stages=3 mesh_draws=6519149 gap=24
-[ENABLE] epoch=0 frames=1..2752      calls=2744  nonzero=0  vals: 0:2744     <- frontend
-[ENABLE] epoch=1 frames=2752..8068   calls=8775  nonzero=0  vals: 0:8775     <- stage 1
-[ENABLE] epoch=2 frames=8068..14922  calls=11852 nonzero=0  vals: 0:11852    <- stage 2
-[ENABLE] epoch=3 frames=14922..17421 calls=4999  nonzero=0  vals: 0:4999     <- stage 3
-[ENABLE] TOTAL calls=28370 nonzero=0
-```
-
-**One observed value in every stage: `0`.** The three epochs were cross-checked against the
-game's own `[RT F]` race-state transitions — a signal the detector does not use — and each opens
-within 1-5 frames of one, with exactly three such transitions in 10,977 lines.
-
-Gate: ring `gfx_0.0.0` timeout delta **0**, 0 windows on the display, 0 panics, the play binary
-md5 read twice and never opened for write.
-
-Confirmed independently in the decomp: `Graphics_EnableFog()`'s entire body is the caps-gated
-half and contains **no state 28 at all** — two paths, one gate, and the ungated one is closed by
-the track data.
-
-Also checked as flagged (not a claimed bug): the two stage-lighting pointers **are swapped**
-between `Race.cpp:790` and `Race.cpp:4485-4486`. It does not affect this result — the four-zero
-test is on all four slots together — but it matters to anyone reasoning about which preset is
-primary. The order-independent colour average is not the part at risk.
-
-**Fog is off the suspect list, with evidence.** The caps fix stays (it is why 35/140/36/37
-arrive) and the range work stays dormant but correct. The next state is `D3DRS_AMBIENT` (139) —
-mapped, stored, read by nothing.
-
-Published: `frames/20261014-e020-enable-census/`. Spec: `docs/FOG-VERIFIED-SPEC.md` §1.1.
-
-
-## RIGHT NOW — CORRECTED
-
-**The Deck daemon is NOT running.** It stopped after finishing
-`BOSS-DIRECTIVE-BOOT-INPUT-20261014-r6` (`partial`) at **12:42:32**, and nothing has been
-picked up since (~2h30m at the time of writing).
-
-Live relay snapshot:
-
-| | |
-|---|---|
-| daemon | **inactive** |
-| running | 0 |
-| pending | 2 |
-| blocked | 3 |
-| total | 270 |
-
-The two pending items are the phone-side fog commands, queued and **waiting for a human**.
-The relay cannot start the daemon — it only appends to the task queue. One line on the Deck
-brings it back and both jobs dispatch on their own.
-
-**The previous revision of this page said "daemon active, two tasks running, zero pending."
-That was written at 09:19 and is now false on both counts.** Corrected here rather than
-quietly overwritten.
-
-## DONE WITH EVIDENCE
-
-Unchanged from the previous revision, and still the honest baseline:
-
-- **54 of 66** translation units compile on x86_64; **66 of 66** in the i386 oracle.
-- 385 pointer-width sites remain across 12 files.
-- The project has reached a real stage and a full stage can be driven start to finish.
-- The 12 October visual/GPU defects each have a written report in `docs/`.
-- Car renders, liveries and wheel placement refreshed; frames published at commit `9af1bd8`.
-
-## NEW SINCE THE LAST REVISION — phone-side, read out of the decomp
-
-Two findings, both written up and committed to `docs/`. Neither required the Deck, so
-neither waited for it.
-
-**1. `docs/FOG-VERIFIED-SPEC.md` — fog is gated by the port's own `GetCaps`.**
-The fog states are absent from the runtime census (no state 28/34/35/36/37) not because the
-port drops them, but because the game never sends them. `Graphics_EnableFog()` is entirely
-behind `Graphics_GetDeviceCaps90()`, which is fed by
-`dpcTriCaps.dwMiscCaps & D3DPMISCCAPS_COLORWRITEENABLE`. The port reports that bit as 0, so
-the game classifies it as an old driver and skips fog. **Implementing fog in the RHI first
-is dead code** — the caps have to be reported first, and the census showing states 35/140
-is the proof that it landed.
-
-**2. `docs/AMBIENT-CONTRADICTION-RESOLVED.md` — r8 and SWEDEN were both right.**
-They measured two different variables. `Scene_RestoreLights` sets a **material** ambient of
-(1,1,1) *and* a **scene** ambient from track data, and D3D7's ambient term is their product.
-r8 measured the material one, found a hardcoded 1.0000, and called the term a no-op — correct
-measurement, wrong conclusion. The scene ambient is the track-driven half the port discards.
-**r8's `1.0000` floor is not evidence the term does nothing; it is the bug.**
-
-## IN PROGRESS
-
-The rendering/playability lane, unstarted since 12:42 because the daemon is down.
-
-## BLOCKED
-
-Three, confirmed live in the relay:
-
-- `LIVE-EVIDENCE-REVIEW-20261013-2124` — blocked since 2026-10-13T21:25
-- `CMR2LRE-RENDERING-FIRST-20261013-2127-r2` — blocked since 2026-10-13T21:30
-- `CMR2LRE-PROPER-RENDERS-20261014-0012-r2` — blocked since 2026-10-14T00:14
-
-Their blockers are not restated here; the workers' own output is the authority.
-
-## NEXT
-
-1. Start the daemon. Two fog jobs dispatch automatically.
-2. Run the **caps change first** and read the census. If states 35 and 140 do not appear,
-   stop — nothing downstream is worth doing until they do.
-3. Then the shader work, arms alternating per frame, prediction on record.
-4. Publish the three blocked tasks' real blockers here rather than a status sentence.
-
-## OPEN QUESTION FOR DECK LENA
-
-The relay's `deck_note` (2026-10-12T22:28) says `out-plain/cmr2` is `94ed1359c405`. That
-binary has since moved — last verified by the phone side at `3f0f96d29c1bcdc174c7df41d486bc36`
-(2026-10-13 06:26). **The relay note is carrying a superseded hash.** The phone side cannot
-verify the current one; please correct it.
-
-**Honesty line:** this update corrects a false coordination claim and publishes two
-phone-side findings. It does not claim the native port is finished, and it does not claim
-anything about the current play binary beyond the last verified hash.
+**Short version: I ran the one-line change. It is safe, it is live, and it moves nothing.
+Two of the three pre-registered predictions are falsified and so is my own sky hypothesis.
+State 139 leaves the suspect list with evidence. Separately, and it matters more: the play
+path has been clobbered ~20 times since 01:58 and the watchdog cannot heal it, because the
+build it wants was never put in `gold/`. I found that build. I did not install it — that is
+not mine to decide. Full write-up: `work/AMBIENT-139-AB-20261015/REPORT.md`.**
 
 ---
 
-# FOG-IS-THE-FIRST-STATE-20261014 — deck-side report
+## 1. THE ANSWER, FIRST
 
-**Added 2026-10-14T17:55+03:00 EEST by the Deck daemon (Lena).** Appended; nothing above
-this line was altered.
+The change was built exactly as briefed: `rs[A7RS_AMBIENT]` instead of the hardcoded white
+material ambient, gated `A7VK_AMBIENT=on`, **default OFF**, arms alternating **per frame**.
+One binary. One run. **No keys.** Ring `gfx_0.0.0` timeout delta **0**.
 
-## 1. RIGHT NOW
+| pre-registered prediction | measured | verdict |
+|---|---|---|
+| snow `road_edge` 0.96 -> **3+** | **1.000 -> 1.000** | **FALSIFIED** |
+| snow road band 206.5 -> **toward 100** | 91.0 -> 90.0 | **no movement** |
+| **every** stage gains contrast (Kenya tightens) | `edge` 2.678 -> 2.514; `sd` 45.3 -> 41.0; `oct` 8 -> 8 | **FALSIFIED** |
+| sky white band is the same dropped state *(my hypothesis, flagged unmeasured)* | exactly-255 count **55 -> 55**; top-80 mean 118.5 -> 109.4 | **FALSIFIED as a clamping story** |
 
-The fog state set is mapped, the vertex-fog term is implemented, and it is **measured
-working, from one binary, both arms alternating per frame**. What is NOT true is the
-brief's premise that fog causes the white-on-white: the game never turns fog on. Fog leaves
-the suspect list with evidence. The next state is **D3DRS_AMBIENT (139)**.
+27 opposite-arm pairs, matched, arm read from the RHI's own `[AB] frame N -> mode M` lines
+and then checked against the ABALT rule as a second derivation: **0 disagreements, 27
+captures per arm.**
 
-## 2. DONE (evidence)
+**Why it cannot move, from the run's own numbers:** state 139 is `0x00000000` on **95.95 %**
+of draws. The arm is zero-guarded (so it cannot go black — that was in the pre-registration,
+not a rescue), which means **on ~96 % of geometry it is byte-identical to the control by
+construction**. On the ~4 % where the measured blue-grey family `(105,130,163)` is live it
+multiplies by ≈0.5. A few percent on a few percent of pixels is exactly what §2 of the
+report measures: no consistent sign.
 
-**Which fog mode the game actually sets** -- asked for explicitly, answered by measurement
-rather than by reading:
-* `FOGVERTEXMODE (140)` = **3 = D3DFOG_LINEAR**, live, `uniq=2`, 17952 calls.
-* `FOGTABLEMODE (35)` = **0 = D3DFOG_NONE**, 17952 calls.
-So the live mode is **vertex fog, linear**. That is the one implemented. Both states are
-mapped and STORED now (they were dropped); 34/36/37 (FOGCOLOR/FOGSTART/FOGEND) are mapped
-and stored too, and 36/37 now ARRIVE where the round-1 census measured them ABSENT -- that
-is the `dwMiscCaps |= 0x80` device-cap bit working, since `Graphics_GetDeviceCaps90()` gates
-every range the game sends.
+**So the ambient hypothesis is now closed from both ends.** Unguarded, it deletes the
+picture (88.6 % black snow — reproduced to three digits on two different builds, 10-12 and
+10-14). Guarded, it changes nothing. **The lever is the zero state itself, or the
+fog/material-colour path — not the substitution.**
 
-**Which quantity feeds fog** -- the brief asked this be stated: the **W component of the
-clip-space position before the perspective divide** (camera-space distance), carried to the
-fragment stage as the `vFogDepth` varying. Not the post-divide depth-buffer value.
+**One thing I will not do:** call this a snow result. The attract route walked Kenya and its
+neighbours, **not Sweden**. Prediction 1 names a snow metric and I did not measure snow. I
+am saying that plainly rather than relabelling a non-snow measurement.
 
-**Predicted vs measured, forced run (fogC, `A7VK_FOGFORCE=30,900,ffffff`, 50 pairs):**
+## 2. THE MEASUREMENT ERROR I CAUGHT IN MY OWN FIRST PASS
 
-    metric      fog ON     fog OFF      delta
-    share      0.55709     0.51888    +0.03821
-    far      119.86660   103.85158   +16.01502
-    mean     109.30377    97.57134   +11.73243
-    (far higher in 48/50 pairs)
+My first analysis paired all 27 opposite-arm captures including **ten that are the same
+static screen in both arms** (mean 172.77, sd 9.46, no road edge — frontend/logo screens the
+attract passes through). That produced a table with `road_edge` ratio **0.000, up 0 / down 3**
+— which *looked* like a large effect and was **a division by zero on frames with no road
+edge**. I caught it by reading the per-frame table instead of the summary. `measure2.py`
+excludes any pair where both frames are static, and reports the two groups separately so
+the exclusion is visible rather than asserted. **The first table is not in the report as a
+finding.** The ten static pairs measure **1.000 on every metric** — which is the correct
+answer, and a sanity check that the harness is not manufacturing differences.
 
-The prediction's SIGN is wrong and that is stated rather than buried: the brief predicted
-the dominant-octile share would FALL; it ROSE. That is what a WHITE fog colour does to a
-mid-brightness scene -- it pushes pixels toward the top octile. The mechanism the brief
-actually specified, **a distance gradient in the ground band**, is present and measured:
-vertical luma gradient (bottom-third minus top-third) is **-29.23 with fog on vs -21.01 with
-it off, 39 % steeper**, concentrated in rows 200-350 (the horizon band) at +22 to +29 luma
-and falling to +3-6 in the extreme foreground.
+## 3. THE PLAY PATH IS STUCK, AND THIS IS THE THING TO FIX FIRST
 
-**Measured, unforced run (fogD, the game's own values): cross-arm signed mean delta -1.07
-luma vs +11.74 forced -- an 18x difference.** `D3DRS_FOGENABLE` is **0 in every one of
-24369 calls, uniq=1**, across a full race. The game does not fog.
+Found while establishing what the control should be. **Not this round's task, so reported
+and not touched:**
 
-**Gate:** ring `gfx_0.0.0` timeout delta **0** on both runs. 0 windows on his desktop.
-0 panics. 8953 and 7977 race frames at `state=8`.
+```
+PLAY/REGISTRY.json   "current": 077142ff4744  ("scene ambient folded into matAmbient")
+PLAY/out-plain/cmr2  actual:    1c0bee6ad2e9  ("near-clip")
+cmr2lre-watchdog.log: "CLOBBERED to 1c0bee6ad2e9 and gold/ has no match for 077142ff4744"
+  -> the same line, every 5-6 minutes, 20+ times since 2026-10-15 01:58, including 11:15
+```
 
-**Published:** `LENAWare-Works/cmr2lab` commit `476bcf5`, dir
-`frames/20261014-1750-fog-first-state/` -- both arms, arm-labelled, md5s in
-`MANIFEST.txt`.
+He launched `077142ff4744` at **01:50:51**; he has been on `1c0bee6a` since **03:03:23**.
+The watchdog fires every 5 minutes and **cannot self-heal**, because the registry names a
+build that was never copied into `gold/` — so it re-fires forever instead of repairing.
 
-**Where I failed, and it was my own instrument:** run `fogB` (first attempt this round)
-produced 100 cross-arm pairs that were a NULL BY CONSTRUCTION -- `A7VK_FOGFORCE` set the
-range and colour but the enable stayed the game's 0, and an unconditional FOGCOLOR read
-overwrote the forced white with the game's unset black. The fog term never executed in
-either arm. Both bugs are fixed in `run/fog-ab-run3`. It was caught by checking the arm
-label against what the code was actually gated on -- the same instrument that caught the
-round-1 parity bug.
+**The missing binary is not lost.** It is on disk, byte-for-byte, from the lane that built
+it: `/home/deck/lena/work/SCENEAMB-20261015/out/cmr2-amb3` md5 `077142ff4744103c0c85b7ea3e6e4cc4`.
 
-## 3. IN PROGRESS (honest fraction)
+I did **not** install it: `PLAY/` is registry-gated, `bin/lre` is the only thing allowed to
+write it, and **which of the two builds he should be on is his call.** The lane that built
+it should land it through the gate.
 
-Fog: **complete** -- 6/6 states mapped, term implemented, forced and unforced both measured,
-published. The whole task is **not** complete: the checklist continues, and the one thing
-the brief wanted most (a fix to the white-on-white) has NOT been delivered by fog, because
-the game does not use it. Item 2 of the order, `D3DRS_AMBIENT` (534,078 calls, mapped,
-stored, read by nothing -- `grep A7RS_AMBIENT a7_vk32.c` = 0), is the next state and is
-untouched.
+## 4. WHAT I VERIFIED BEFORE PATCHING (the brief said do not take my word)
 
-**Honesty line:** this section claims the fog TERM works and the game does not enable fog.
-It does not claim fog improved the shipped picture, because it cannot and does not.
+All four structural claims **TRUE**, measured on the tree: 139 is MAPPED (`map_rs()`,
+`A7RS_AMBIENT`); it is NOT in the dropped ledger (dropped are 2,4,8,33,41,60,136,138,141,145,
+146,147,148); `grep -c A7RS_AMBIENT a7_vk32.c` == **0**; the vert shader adds a hardcoded
+white material ambient. **The fifth claim — "one fix closes both ambient and `flags.w`" — is
+FALSE** and was already on record (`AMB-AB-20261015/REPORT.md` §5): `matAmbient` and
+`flags[3]` are separate slots. I touched only `matAmbient`.
+
+Also worth recording: **my own first control check was wrong.** It looked for the string
+`ABALT` — which **the game itself contains** (`_NL_ABALTMON_3`, month names). A false
+failure. The marker is now a string only the patch can produce.
+
+## 5. GATES
+
+One binary, one run, no keys, attract route. Ring delta **0**. Instrument proven live before
+the run was spent (`[AB] ABALT period=20 frames`, 365 flips, 183 AMB frames vs 182 NORMAL).
+Census gate: the run reached frame **7229** with **2,114,427 draws / 21,769,759 triangles**.
+`GameInfo.rcf` / `Controller.rcf` **UNCHANGED**. Vision pass on the 5029/5049 pair confirms a
+real race in both arms — rally car, dirt track, dust, trees, white sky. **The play path was
+never opened for write; md5 `1c0bee6a` before and after; registry untouched. Nothing shared
+was written and nothing was deleted.**
+
+*A gate I had to fix mid-round, on the record:* my first census gate demanded the
+`[CENSUS]` block, which only dumps every 200000 frames — a 7229-frame run never emits it, so
+the gate **rejected a perfectly good race**. The evidence that a race was reached was in the
+per-frame draw lines all along. The gate now uses those.
+
+## 6. WHAT LANDED
+
+* `BLUEPRINT.md` §1 — new entry with the symbol anchor: **the scene ambient as a missing unit
+  of light is NO**, measured, with the 95.95 %-zero mechanism and the "both forms fail, for
+  opposite reasons" line. So nobody re-opens 139 next week.
+* `work/AMBIENT-139-AB-20261015/` — `PRE-REGISTRATION.md` (written before the build),
+  `patch_amb139.py` (7 edits, refuses on drift), `build-arm.sh` (provenance + marker checks),
+  `run-ab.sh` (per-frame clock + census gate), `measure.py` / `measure2.py`, 54 captures.
+* A **reusable instrument**: `A7VK_ABALT` is a per-frame alternating clock any future arm can
+  schedule on, with the liveness check and the census gate already wired. Four sibling lanes
+  lost runs tonight to wall-clock scheduling and to menu-frame captures; this harness cannot
+  do either.
+
+**NOT installed, NOT handed over. Status: done — negative, with the mechanism.**
+
+[exit 0]
