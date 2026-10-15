@@ -12,14 +12,15 @@ The actual engine, recompiled for Linux.
 
 The game's own `.c3d` geometry and `.bfl` liveries, decoded and rasterised by a renderer
 written from scratch in this repo: [`tools/render/`](tools/render/) — no 3D engine, no game
-process, no GPU. Point it at your own copy and it regenerates every image on this page:
+process, no GPU. Point it at your own copy and it regenerates the car images on this page:
 
 ```sh
 CMR2_CARS=/path/to/game/Game/Cars python3 tools/render/make_assets.py
 ```
 
-See [`docs/RENDER.md`](docs/RENDER.md) for the format notes and the two things that are easy
-to get wrong (wheel placement, and the livery-vs-AO texture choice).
+See [`docs/RENDER.md`](docs/RENDER.md) for the format notes and the three things that are easy
+to get wrong (wheel placement, the livery-vs-AO texture choice, and — measured 15 October
+— **which parts of a `.c3d` are actually the car**).
 
 | | | | |
 |---|---|---|---|
@@ -38,14 +39,14 @@ to get wrong (wheel placement, and the livery-vs-AO texture choice).
 >
 > Then come back here — the rest of this page is the detail behind those three.
 
-> **Just want to LOOK at the game?** → **the screenshots in this README**
-> published so far, full-size 1280×800 PNG, no downscale: the 09:27 build he called
-> *"amazing"* next to tonight's, plus frames of his own live session. Open them directly;
-> nothing there is a mock-up.
+> **Just want to LOOK at something?** The four cars and the banner on this page are drawn
+> by this repo's own renderer from the game's own files. The race frame is the game's own
+> 3D path on a Steam Deck. Full-size originals are in [`assets/`](assets/) and
+> [`docs/media/`](docs/media/). Nothing here is a mock-up and nothing is a target render.
 
 ---
 
-> **12 October 2026.** The game boots its own frontend, loads a real Kenya stage off
+> **15 October 2026.** The game boots its own frontend, loads a real Kenya stage off
 > disk, and drives a car with the game's own physics — on this project's renderer, on a
 > Steam Deck. **A full stage has been driven start to finish.**
 >
@@ -56,12 +57,21 @@ to get wrong (wheel placement, and the livery-vs-AO texture choice).
 > built; and near-plane geometry was **smeared across the frame**. Each has a written
 > report in `docs/`.
 >
-> **It is still not *right*:** the road does not separate from the terrain — one
-> continuous warm field, white-on-white on snow stages. The honest record of that search
-> is worth more than a clean claim: we tested the obvious cause (the game's per-vertex
-> colours) and *measured that it is not the answer*; we tested the lighting term and it
-> came back a 1.0000 no-op. **That 1.0000 is now understood**, and so is the fog term —
-> both were read out of the game's own decompiled source on 14 October:
+> **The picture broke through on 14 October: the road separates from the terrain.**
+> Confirmed three ways — colour separation across eight coherent dirt materials,
+> monotonic edge tracking (`x700@y460` → `x580@y580`), and an independent implementation
+> on the phone side measuring ground `|dL/dx|` **1.68** against the terrain's **14.50**,
+> 8.6×, same direction. The wall that had stood since 5 October is down.
+> Read the limit honestly: `road_edge` clears the threshold on **two of five** race frames
+> (6.99 / 7.90), against Sweden's undrivable 1.04. It is not consistent yet.
+>
+> **What is still not *right*:** the road does not yet recede to a horizon, and there is a
+> new #1 defect — **the sky clips to pure white** (80 rows of exact 255, hard step,
+> world-locked, only when the camera pitches up). The honest record of the search is worth
+> more than a clean claim: we tested the obvious cause (the game's per-vertex colours) and
+> *measured that it is not the answer*; we tested the lighting term and it came back a
+> 1.0000 no-op. **That 1.0000 is now understood**, and so is the fog term — both were read
+> out of the game's own decompiled source on 14 October:
 >
 > - **[`docs/AMBIENT-CONTRADICTION-RESOLVED.md`](docs/AMBIENT-CONTRADICTION-RESOLVED.md)** —
 >   the lighting term is not a no-op. The port keeps a hardcoded material ambient of 1.0
@@ -121,8 +131,9 @@ across the world.
 
 ![A race frame from the native port](docs/media/race-frame.jpg)
 
-*The game's own renderer running a stage on a Steam Deck. The road does not separate
-from the terrain yet — that is the open lighting bug, named in
+*The game's own renderer running a stage on a Steam Deck. The road now separates from
+terrain — measured three ways on 14 October, on two of five race frames. What is still
+wrong is the sky, which clips to white. Both are named in
 [`docs/ROAD-r6-REPORT.md`](docs/ROAD-r6-REPORT.md).*
 
 Nothing here is a mock-up and nothing here is a rendering of what we hope it will look
@@ -146,7 +157,8 @@ the public documentation both do this).
 | **Watch the game's own code run on Linux** | ⚠️ Yes — boots to its frontend, loads a stage, runs the race loop | `docs/PLAY-CHECKPOINT.md` |
 | **A session that lasts longer than two minutes** | ✅ **Yes, since 11 Oct** — the GPU bug that ended every run is fixed | `docs/GPU-LIFETIME-FIX.md` |
 | **A car you can actually drive** | ⚠️ **Yes again since 11 Oct 11:02** — our own tool had broken it for 2½ hours | `docs/DRIVE-LOOP-REGRESSION.md` |
-| **Lighting that looks like the original** | ❌ No — the road's per-vertex shading is dropped | `docs/ROAD-r6-REPORT.md` |
+| **The road visible on screen** | ⚠️ **Partly, since 14 Oct** — separates on 2 of 5 race frames | `docs/ROAD-r6-REPORT.md` |
+| **Lighting that looks like the original** | ❌ No — a hardcoded material ambient of 1.0, scene ambient discarded | `docs/AMBIENT-CONTRADICTION-RESOLVED.md` |
 | **The car in the setup screen** | ❌ No — it renders collapsed | `docs/MENU-CAR-EVIDENCE.md` |
 | **More than half the game's code compiling for Linux** | ✅ 54 of 66 files (compile-level) | `docs/PORT-PLAN.md` |
 | **The rest compiling** | ❌ Not yet — pointer-width work, 385 sites left in 12 files | `docs/PORT-PLAN.md` |

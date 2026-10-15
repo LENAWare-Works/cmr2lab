@@ -26,7 +26,7 @@ The field map in `c3dlib.py` is measured from the files, not inferred — see
 
 ---
 
-## The two things that are easy to get wrong
+## The three things that are easy to get wrong
 
 ### 1. A car is not one mesh, and the wheels are not where you think
 
@@ -46,7 +46,7 @@ These are the fleet's axle positions. A car with a different track or wheelbase 
 adjusted — the same constraint the engine has: the game reads `halfExtents` and
 `wheelPos[4]` for physics and **never consults the mesh**, so a swapped model whose wheels
 do not match its collision box will have its wheels visibly detach. See
-[`CAR-FORMAT.md`](CAR-FORMAT.md).
+[`CAR.md`](CAR.md).
 
 There are also **ten `.c3d` variants per car** (`a1`, `a5`, `c1`, `c3`, `c5`, `d1`, `d3`,
 `e3`, `f3`, `f4`). The suffix is a variant selector, not a side — `L` is *light wheels* and
@@ -65,6 +65,45 @@ best  = max(cands, key=lambda k: sat(d[k]))
 
 Parts left deliberately untextured: the lights and the underbody. In the engine these are
 unlit / additive, and giving them a body texture makes them look painted on.
+
+### 3. A `.c3d` is a set of render passes, and only some of them are the car
+
+Measured 15 October, and it had been wrong in every image this pipeline ever produced.
+
+A car file is not "the car". Laid out by name, `205a1N.c3d` holds fourteen parts and only
+six of them are bodywork:
+
+```
+01WhlLOD00 x4   the wheels (stamped to the four corners by build())
+05BonCam        bonnet-camera interior
+06UnlitSim      unlit shadow / interior pass
+07SemiTrans     glass
+08BodySim       ┐
+09Bonnet        │
+10RBump         │  the body panels
+11Boot10        │
+13RSpoiler      ┘
+14LightEffe     light-effect flares, unlit / additive
+15undsim        underbody pass
+```
+
+None of `06UnlitSim`, `15undsim`, `05BonCam` or `14LightEffe` is bodywork. In the engine
+they are unlit, additive or otherwise special-cased passes. This rasteriser draws
+everything opaque and lit, so drawing them leaves a large flat grey slab through the
+middle of the car and loose plates around it — which reads as an exploded model and is
+not one. `build()` now drops them, selected by the **first two characters** of the part
+name: those prefixes are stable across the fleet even where the names are not
+(`06UnlitSim` / `06IntSim` / `06Unlit`, `15undsim` / `15UndSim`, `09Bonnet` / `09BonDay`).
+
+**The bug that hid it.** `build()` accepted `skip_parts` and tested it with
+`np.isin(TP, skip_parts)` — but every caller passed a **set**, and `np.asarray({12})` is a
+0-d *object* array, not an array of elements. `np.isin` therefore matched nothing, every
+time, and the parameter was silently inert from the first commit. The wheel list worked
+because `wids` is a plain **list**; the two were written the same way and behaved
+differently. The fix normalises to a list.
+
+A parameter that is accepted, documented, and never once applied is invisible to every
+check that only asks *did it run*.
 
 ---
 
@@ -88,11 +127,34 @@ especially with a language model looking at the picture. The check that settles 
 numeric, and it is the one this pipeline was validated with:
 
 * **runs per row** — walk each row of the silhouette and count the number of continuous
-  spans. An intact car is **1** on essentially every row. An exploded mesh shows **5–10**.
-* **bounding-box fill** — intact cars land around **0.65–0.70**.
+  spans. Re-measured across the fleet on 15 October, the honest figures are **1 on ~60 % of
+  rows, 2 on ~33 %, and never more than 3** (e.g. 205: 54 rows of 1, 32 of 2, 2 of 3). The
+  extra spans are the wheels separating from the body below the sill, which is correct. An
+  exploded mesh shows **5-10 per row**, so the useful threshold is the **maximum**, not the
+  mean — a mean hides a handful of blown-out rows.
+* **bounding-box fill** — intact cars land around **0.56–0.69**, fleet-wide.
 
 Both numbers are stable across the whole fleet. If a change drops either of them, the
 geometry broke, whatever the render looks like.
+
+**And they did not catch the defect in §3.** Both passed on every image this pipeline
+had ever produced, because the stray parts were *coincident* with the body rather than
+detached from it: the silhouette stayed one span per row, the fill stayed in range, and
+the car was still wrong. These two checks verify that the mesh is **connected**. They
+cannot verify that the mesh is the **right** mesh.
+
+What found it was isolating one part at a time and rendering it *at a fixed camera*.
+Two traps when you do that, both hit on the way here:
+
+* **`render()` re-centres the camera from whatever vertices you hand it.** Subset the
+  vertices along with the triangles and every part is framed differently, so the numbers
+  are not comparable and the part that "dominates" changes run to run. Keep the full
+  vertex array and subset **only** the triangle list.
+* **Do not ask a language model to settle it.** On this very inspect, one described a
+  correct render as seen *from below* — measured, the camera is 1.56 m above the roof —
+  and it called the car broken both before and after the fix. Use vision for *what is
+  there*; use the numbers for *which part is where*. A side-by-side A/B is far more
+  reliable than any single absolute description.
 
 For the banner specifically, the shadow is verifiable by rendering it twice at strength 0
 and 1 and diffing: the shadow should be present as a distinct region extending below the

@@ -27,8 +27,25 @@ import c3dlib
 # axle positions for the CMR2 fleet (metres, car space)
 WHEEL_X, WHEEL_Y, WHEEL_Z = 1.245, -0.227, 0.747
 
+# A .c3d is a set of render passes, not one mesh, and only some of them are the
+# car. The first two characters of a part name are its draw-order prefix, and
+# those ARE stable across the fleet -- the rest of the name is not
+# (06UnlitSim / 06IntSim / 06Unlit, 15undsim / 15UndSim, 09Bonnet / 09BonDay).
+#   05  bonnet-camera interior        14  light-effect flares
+#   06  unlit shadow / interior sim   15  underbody sim
+# This viewer draws everything opaque and lit, so those four passes come out as
+# a grey slab under the car and loose plates floating around it. They are not
+# part of the body and must not be drawn.
+NON_BODY_PREFIX = ('05', '06', '14', '15')
 
-def build(cid, skip_parts=()):
+
+def non_body_ids(parts):
+    """Part ids of the sim / camera / effect passes, ready for skip_parts."""
+    return [q['idx'] for q in parts
+            if 'Whl' not in q['name'] and q['name'][:2] in NON_BODY_PREFIX]
+
+
+def build(cid, skip_parts=(), skip_non_body=True):
     """-> (hdr, parts, V, N, UV, T, TP)  with wheels stamped at the 4 corners."""
     m = c3dlib.C3D(c3dlib.car_file(cid))
     P = m.parts()
@@ -37,7 +54,14 @@ def build(cid, skip_parts=()):
     UV = np.array(uvs, np.float64); T = np.array(tris, np.int32); TP = np.array(tpart, np.int32)
 
     wids = [p['idx'] for p in P if 'Whl' in p['name']]
-    isw = np.isin(TP, wids) | np.isin(TP, skip_parts)
+
+    # np.isin(TP, {5}) matches NOTHING: np.asarray({5}) is a 0-d OBJECT array,
+    # not an array of elements. Every caller passed a set, so skip_parts was
+    # silently ignored from the day this was written. Normalise to a list.
+    skip = [int(x) for x in skip_parts]
+    if skip_non_body:
+        skip = skip + non_body_ids(P)
+    isw = np.isin(TP, wids) | np.isin(TP, skip)
     body_t, body_tp = T[~isw], TP[~isw]
     keep_v = np.unique(body_t) if len(body_t) else np.array([], np.int32)
     remap = -np.ones(len(V), np.int32); remap[keep_v] = np.arange(len(keep_v))

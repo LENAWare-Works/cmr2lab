@@ -81,7 +81,7 @@ def ground(im, mask):
 def car(cid, W=980, H=640, az=214.0, el=12.0, cars=None):
     """Render one car and ground it. Returns (grounded_rgb, raw_rgb, mask)."""
     d = tex.textures_for(cid, cars)
-    m, P, V, N, UV, T, TP = R.build(cid, skip_parts={12})
+    m, P, V, N, UV, T, TP = R.build(cid)
     tmap = livery.build_texmap(cid, d)
     im, mk = R.render(V, N, UV, T, TP, tmap, livery.FB,
                       W=W, H=H, az=az, el=el, dist=10.6, fov=28,
@@ -94,7 +94,7 @@ def hero(cid, path, W=1280, H=430, cars=None):
     alpha from an RGB file and the car's own background comes with it, which
     shows up as a pale rectangle pasted over the gradient."""
     d = tex.textures_for(cid, cars)
-    m, P, V, N, UV, T, TP = R.build(cid, skip_parts={12})
+    m, P, V, N, UV, T, TP = R.build(cid)
     tmap = livery.build_texmap(cid, d, verbose=False)
     raw, mask = R.render(V, N, UV, T, TP, tmap, livery.FB,
                          W=900, H=620, az=214.0, el=12.0, dist=10.6, fov=28,
