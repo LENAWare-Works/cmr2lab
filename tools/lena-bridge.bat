@@ -1,28 +1,40 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-REM ============================================================
-REM  Lena <-> DeepCode headless bridge.  Double-click this file.
-REM  Needs Python (python.org, tick "Add to PATH").
-REM ============================================================
+echo ===============================================
+echo   Lena  ^<->  DeepCode bridge
+echo ===============================================
+echo.
 
-REM --- where is deepcode? uv puts it here, not on PATH ---
-if not defined DC_CMD (
-  for %%P in ("%USERPROFILE%\.local\bin\deepcode.exe" "%USERPROFILE%\.local\bin\deepcode.cmd" "%USERPROFILE%\.local\bin\deepcode") do (
-    if exist %%P set "DC_CMD=%%~P"
-  )
+REM ---- 1. which command runs DeepCode? ask once, then remember ----
+set "DC_CMD="
+if exist "bridge-cmd.txt" (
+  set /p DC_CMD=<"bridge-cmd.txt"
+  if "!DC_CMD!"=="" set "DC_CMD="
 )
-if not defined DC_CMD set "DC_CMD=deepcode"
 
-REM --- the bridge replaces {prompt} with what Lena said ---
-if not defined DC_ARGS set "DC_ARGS=exec {prompt} --json"
+if not defined DC_CMD (
+  echo Point me at DeepCode. Paste the full path to it, or just its name
+  echo if it is on PATH.  Examples:
+  echo    deepcode
+  echo    %USERPROFILE%\.local\bin\deepcode.exe
+  echo    C:\Users\you\AppData\Roaming\npm\deepcode.cmd
+  echo.
+  echo Not sure? open another window and run:   where deepcode
+  echo and if that finds nothing:              uv tool list
+  echo.
+  set /p DC_CMD="command> "
+  if "!DC_CMD!"=="" goto :fail
+  >"bridge-cmd.txt" echo !DC_CMD!
+)
 
-REM --- private topics, remembered after the first run ---
+set "DC_ARGS=exec {prompt} --json"
+
+REM ---- 2. topics: private, made once, kept in bridge-topics.txt ----
 if exist "bridge-topics.txt" (
   for /f "usebackq tokens=1,2 delims==" %%A in ("bridge-topics.txt") do set "%%A=%%B"
 ) else (
-  echo.
   echo Generating your private topics...
   for /f "tokens=1,2 delims==" %%A in ('python lena-bridge.py --newtopic') do set "%%A=%%B"
   >bridge-topics.txt echo BRIDGE_IN=%BRIDGE_IN%
@@ -30,19 +42,28 @@ if exist "bridge-topics.txt" (
 )
 
 echo.
-echo  command : %DC_CMD% %DC_ARGS%
-echo  in      : %BRIDGE_IN%
-echo  out     : %BRIDGE_OUT%
+echo   command : !DC_CMD! !DC_ARGS!
+echo   in      : !BRIDGE_IN!
+echo   out     : !BRIDGE_OUT!
 echo.
-echo  Testing DeepCode once before going live...
+echo   Testing DeepCode before going live...
 echo.
 python lena-bridge.py --test "Reply with exactly: bridge test ok"
 echo.
-echo  If that printed an answer, the bridge works. Press a key to run it.
-echo  If it said "command not found", run:  uv tool list
+echo ---------------------------------------------------------------
+echo   Answer above? Good. Press a key to start the bridge.
+echo   "command not found" or an error? Press ctrl-c, delete
+echo   bridge-cmd.txt, and run this again with the right path.
+echo ---------------------------------------------------------------
 pause
 
 python lena-bridge.py
 echo.
 echo Bridge stopped.
+pause
+goto :eof
+
+:fail
+echo.
+echo No command given. Nothing started.
 pause
